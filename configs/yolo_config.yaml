@@ -1,0 +1,11 @@
+path: C:/Users/Grigory G/Documents/Python/GrGriePreis/data
+train: images/train
+val: images/train
+
+# Classes
+names:
+  0: Name
+  1: Price
+  2: Weight
+  3: Discount
+  4: Date

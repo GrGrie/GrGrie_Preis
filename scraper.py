@@ -1,209 +1,170 @@
 import time
-import requests
+import os
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
-import os
-from urllib.parse import urljoin
-import json
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-class LidlScraper:
-    def __init__(self, headless=True):
-        """Initialize the scraper with Chrome options"""
-        self.chrome_options = Options()
-        if headless:
-            self.chrome_options.add_argument("--headless")
-        self.chrome_options.add_argument("--no-sandbox")
-        self.chrome_options.add_argument("--disable-dev-shm-usage")
-        self.chrome_options.add_argument("--disable-gpu")
-        self.chrome_options.add_argument("--window-size=1920,1080")
-        
-        # Install and setup ChromeDriver automatically
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=self.chrome_options)
-        self.wait = WebDriverWait(self.driver, 20)
+def setup_driver():
+    """Setup Chrome driver with options"""
+    options = Options()
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    return webdriver.Chrome(options=options)
+
+def handle_popups(driver):
+    """Handle cookie banner and store selection popup"""
+    wait = WebDriverWait(driver, 10)
     
-    print("Hello!)")
-    def scrape_products(self, url):
-        """Scrape products from the Lidl page"""
+    # Handle cookie banner
+    try:
+        wait.until(EC.presence_of_element_located((By.ID, "onetrust-banner-sdk")))
+        cookie_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#onetrust-accept-btn-handler")))
+        cookie_btn.click()
+        print("✓ Accepted cookies")
+        time.sleep(2)
+    except TimeoutException:
+        print("No cookie banner found")
+    
+    # Handle store selection popup
+    try:
+        close_btn = WebDriverWait(driver, 5).until(
+            EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Übersicht schließen']"))
+        )
+        close_btn.click()
+        print("✓ Closed store selection popup")
+        time.sleep(2)
+    except TimeoutException:
+        print("No store selection popup found")
+
+def find_prospekt(driver):
+    """Find and return the first Aktionsprospekt link"""
+    selectors = [
+        "a.flyer[data-track-name='Aktionsprospekt']",
+        "a.flyer[data-track-type='flyer']",
+        "a[href*='aktionsprospekt']",
+        ".flyer"
+    ]
+    
+    for selector in selectors:
         try:
-            print(f"Loading page: {url}")
-            self.driver.get(url)
-            
-            # Wait for the page to load and products to appear
-            print("Waiting for products to load...")
-            self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-selector='PRODUCT']"))
+            link = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, selector)))
+            print(f"✓ Found prospekt: {link.get_attribute('data-track-name') or 'Unknown'}")
+            return link.get_attribute("href")
+        except TimeoutException:
+            continue
+    return None
+
+def take_screenshots(driver, screenshot_dir):
+    """Navigate through prospekt pages and take screenshots"""
+    page = 1
+    max_pages = 100
+    
+    while page <= max_pages:
+        # Wait for page content to load
+        time.sleep(2)
+        
+        # Find the prospekt content div
+        try:
+            page_element = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.page__wrapper"))
             )
             
-            # Additional wait to ensure all products are loaded
+            # Take screenshot of only the prospekt content
+            screenshot_path = os.path.join(screenshot_dir, f"page_{page:02d}.png")
+            page_element.screenshot(screenshot_path)
+            print(f"✓ Saved page_{page:02d}.png")
+            
+        except Exception as e:
+            print(f"Could not capture page {page}: {e}")
+            # Fallback to full page screenshot if page__wrapper not found
+            screenshot_path = os.path.join(screenshot_dir, f"page_{page:02d}.png")
+            driver.save_screenshot(screenshot_path)
+            print(f"✓ Saved page_{page:02d}.png (full page fallback)")
+        
+        # Find next button
+        next_selectors = [
+            "div.content_navigation.content_navigation--right button",
+            ".content_navigation--right button"
+        ]
+        
+        next_btn = None
+        for selector in next_selectors:
+            try:
+                elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                for btn in elements:
+                    if (btn.is_displayed() and btn.is_enabled() and 
+                        not btn.get_attribute("disabled") and 
+                        "disabled" not in (btn.get_attribute("class") or "").lower()):
+                        next_btn = btn
+                        break
+                if next_btn:
+                    break
+            except:
+                continue
+        
+        if not next_btn:
+            print("No more pages found")
+            break
+            
+        # Click next button
+        try:
+            driver.execute_script("arguments[0].click();", next_btn)
+            page += 1
             time.sleep(3)
-            
-            # Find all product containers
-            products = self.driver.find_elements(By.CSS_SELECTOR, "[data-selector='PRODUCT']")
-            print(f"Found {len(products)} products")
-            
-            scraped_data = []
-            
-            for i, product in enumerate(products):
-                try:
-                    product_data = self.extract_product_info(product, i)
-                    if product_data:
-                        scraped_data.append(product_data)
-                except Exception as e:
-                    print(f"Error extracting product {i}: {e}")
-                    continue
-            
-            return scraped_data
-            
         except Exception as e:
-            print(f"Error scraping products: {e}")
-            return []
+            print(f"Could not navigate to next page: {e}")
+            break
     
-    def extract_product_info(self, product_element, index):
-        """Extract information from a single product element"""
-        product_data = {}
-        
-        try:
-            # Product name/title
-            try:
-                title_element = product_element.find_element(By.CSS_SELECTOR, ".product-title, .prd-title, h3, h4")
-                product_data['title'] = title_element.text.strip()
-            except:
-                product_data['title'] = f"Product {index + 1}"
-            
-            # Product price
-            try:
-                price_element = product_element.find_element(By.CSS_SELECTOR, ".price, .prd-price, [class*='price']")
-                product_data['price'] = price_element.text.strip()
-            except:
-                product_data['price'] = "Price not found"
-            
-            # Product image
-            try:
-                img_element = product_element.find_element(By.CSS_SELECTOR, "img")
-                img_src = img_element.get_attribute("src") or img_element.get_attribute("data-src")
-                if img_src:
-                    # Convert relative URLs to absolute
-                    product_data['image_url'] = urljoin("https://www.lidl.de", img_src)
-                else:
-                    product_data['image_url'] = "No image found"
-            except:
-                product_data['image_url'] = "No image found"
-            
-            # Product description/details
-            try:
-                desc_element = product_element.find_element(By.CSS_SELECTOR, ".product-description, .prd-description, .description")
-                product_data['description'] = desc_element.text.strip()
-            except:
-                product_data['description'] = "No description"
-            
-            # Additional product info
-            try:
-                info_elements = product_element.find_elements(By.CSS_SELECTOR, ".product-info span, .prd-info span")
-                product_data['additional_info'] = [elem.text.strip() for elem in info_elements if elem.text.strip()]
-            except:
-                product_data['additional_info'] = []
-            
-            print(f"Extracted: {product_data['title']}")
-            return product_data
-            
-        except Exception as e:
-            print(f"Error extracting product info: {e}")
-            return None
-    
-    def download_images(self, products_data, download_folder="lidl_images"):
-        """Download product images"""
-        if not os.path.exists(download_folder):
-            os.makedirs(download_folder)
-        
-        downloaded_count = 0
-        
-        for i, product in enumerate(products_data):
-            if product['image_url'] and product['image_url'] != "No image found":
-                try:
-                    response = requests.get(product['image_url'], timeout=10)
-                    if response.status_code == 200:
-                        # Create safe filename
-                        safe_title = "".join(c for c in product['title'] if c.isalnum() or c in (' ', '-', '_')).rstrip()
-                        filename = f"{i+1:03d}_{safe_title[:50]}.jpg"
-                        filepath = os.path.join(download_folder, filename)
-                        
-                        with open(filepath, 'wb') as f:
-                            f.write(response.content)
-                        
-                        product['local_image_path'] = filepath
-                        downloaded_count += 1
-                        print(f"Downloaded: {filename}")
-                    
-                except Exception as e:
-                    print(f"Error downloading image for {product['title']}: {e}")
-        
-        print(f"Downloaded {downloaded_count} images to {download_folder}/")
-        return downloaded_count
-    
-    def save_to_json(self, products_data, filename="lidl_products.json"):
-        """Save scraped data to JSON file"""
-        try:
-            with open(filename, 'w', encoding='utf-8') as f:
-                json.dump(products_data, f, indent=2, ensure_ascii=False)
-            print(f"Data saved to {filename}")
-        except Exception as e:
-            print(f"Error saving to JSON: {e}")
-    
-    def print_products_summary(self, products_data):
-        """Print a summary of scraped products"""
-        print(f"\n=== SCRAPED PRODUCTS SUMMARY ===")
-        print(f"Total products found: {len(products_data)}")
-        print("-" * 50)
-        
-        for i, product in enumerate(products_data, 1):
-            print(f"{i}. {product['title']}")
-            print(f"   Price: {product['price']}")
-            print(f"   Image: {product['image_url'][:80]}{'...' if len(product['image_url']) > 80 else ''}")
-            if product.get('description') and product['description'] != "No description":
-                print(f"   Description: {product['description'][:100]}{'...' if len(product['description']) > 100 else ''}")
-            print()
-    
-    def close(self):
-        """Close the browser driver"""
-        if self.driver:
-            self.driver.quit()
+    return page
 
 def main():
-    """Main function to run the scraper"""
-    url = "https://www.lidl.de/c/billiger-montag/a10006065"
-    
-    scraper = LidlScraper(headless=False)  # Set to True for headless mode
+    """Main function to open Lidl prospekt and take screenshots"""
+    driver = setup_driver()
     
     try:
-        # Scrape products
-        products = scraper.scrape_products(url)
+        print("Opening Lidl prospekte page...")
+        driver.get("https://www.lidl.de/c/online-prospekte/s10005610")
         
-        if products:
-            # Print summary
-            scraper.print_products_summary(products)
-            
-            # Save to JSON
-            scraper.save_to_json(products)
-            
-            # Download images (optional)
-            download_choice = input("\nDo you want to download product images? (y/n): ").lower()
-            if download_choice == 'y':
-                scraper.download_images(products)
-        else:
-            print("No products found or error occurred during scraping.")
-    
-    except KeyboardInterrupt:
-        print("\nScraping interrupted by user.")
+        # Handle popups
+        handle_popups(driver)
+        
+        # Find prospekt
+        prospekt_url = find_prospekt(driver)
+        if not prospekt_url:
+            print("Could not find any prospekt")
+            return
+        
+        # Open prospekt in new tab and close old one
+        driver.execute_script(f"window.open('{prospekt_url}', '_blank');")
+        driver.switch_to.window(driver.window_handles[1])
+        driver.switch_to.window(driver.window_handles[0])
+        driver.close()
+        driver.switch_to.window(driver.window_handles[0])
+        print("✓ Opened prospekt in new tab")
+        
+        time.sleep(5)  # Wait for prospekt to load
+        
+        # Create screenshot directory
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        screenshot_dir = f"lidl_prospekt_screenshots_{timestamp}"
+        os.makedirs(screenshot_dir, exist_ok=True)
+        print(f"Created directory: {screenshot_dir}")
+        
+        # Take screenshots
+        page_count = take_screenshots(driver, screenshot_dir)
+        print(f"✓ Saved {page_count} screenshots to {screenshot_dir}/")
+        
+        print("Press Enter to close...")
+        input()
+        
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"Error: {e}")
     finally:
-        scraper.close()
+        driver.quit()
 
 if __name__ == "__main__":
     main()
