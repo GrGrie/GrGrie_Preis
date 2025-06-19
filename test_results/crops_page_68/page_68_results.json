@@ -1,0 +1,202 @@
+{
+  "original_image": "test_results\\crops_page_68\\page_68_original.png",
+  "annotated_image": "test_results\\crops_page_68\\page_68_annotated.png",
+  "total_crops": 15,
+  "crops": [
+    {
+      "crop_id": 0,
+      "class_name": "Price",
+      "confidence": 0.9294,
+      "bbox": [
+        81,
+        680,
+        128,
+        699
+      ],
+      "crop_filename": "page_68_crop_00_Price.png",
+      "recognized_text": "[TEXT_47x19]"
+    },
+    {
+      "crop_id": 1,
+      "class_name": "Price",
+      "confidence": 0.9097,
+      "bbox": [
+        81,
+        460,
+        128,
+        481
+      ],
+      "crop_filename": "page_68_crop_01_Price.png",
+      "recognized_text": "[TEXT_47x21]"
+    },
+    {
+      "crop_id": 2,
+      "class_name": "Name",
+      "confidence": 0.9069,
+      "bbox": [
+        95,
+        348,
+        138,
+        385
+      ],
+      "crop_filename": "page_68_crop_02_Name.png",
+      "recognized_text": "[TEXT_43x37]"
+    },
+    {
+      "crop_id": 3,
+      "class_name": "Price",
+      "confidence": 0.8913,
+      "bbox": [
+        214,
+        460,
+        262,
+        480
+      ],
+      "crop_filename": "page_68_crop_03_Price.png",
+      "recognized_text": "[TEXT_48x20]"
+    },
+    {
+      "crop_id": 4,
+      "class_name": "Discount",
+      "confidence": 0.891,
+      "bbox": [
+        99,
+        657,
+        130,
+        670
+      ],
+      "crop_filename": "page_68_crop_04_Discount.png",
+      "recognized_text": "[TEXT_31x13]"
+    },
+    {
+      "crop_id": 5,
+      "class_name": "Price",
+      "confidence": 0.8257,
+      "bbox": [
+        215,
+        673,
+        264,
+        697
+      ],
+      "crop_filename": "page_68_crop_05_Price.png",
+      "recognized_text": "[TEXT_49x24]"
+    },
+    {
+      "crop_id": 6,
+      "class_name": "Name",
+      "confidence": 0.8202,
+      "bbox": [
+        227,
+        557,
+        262,
+        593
+      ],
+      "crop_filename": "page_68_crop_06_Name.png",
+      "recognized_text": "[TEXT_35x36]"
+    },
+    {
+      "crop_id": 7,
+      "class_name": "Discount",
+      "confidence": 0.7762,
+      "bbox": [
+        100,
+        439,
+        130,
+        451
+      ],
+      "crop_filename": "page_68_crop_07_Discount.png",
+      "recognized_text": "[TEXT_30x12]"
+    },
+    {
+      "crop_id": 8,
+      "class_name": "Name",
+      "confidence": 0.7424,
+      "bbox": [
+        106,
+        548,
+        138,
+        583
+      ],
+      "crop_filename": "page_68_crop_08_Name.png",
+      "recognized_text": "[TEXT_32x35]"
+    },
+    {
+      "crop_id": 9,
+      "class_name": "Discount",
+      "confidence": 0.6645,
+      "bbox": [
+        230,
+        657,
+        270,
+        670
+      ],
+      "crop_filename": "page_68_crop_09_Discount.png",
+      "recognized_text": "[TEXT_40x13]"
+    },
+    {
+      "crop_id": 10,
+      "class_name": "Name",
+      "confidence": 0.6085,
+      "bbox": [
+        223,
+        342,
+        275,
+        379
+      ],
+      "crop_filename": "page_68_crop_10_Name.png",
+      "recognized_text": "[TEXT_52x37]"
+    },
+    {
+      "crop_id": 11,
+      "class_name": "Discount",
+      "confidence": 0.4205,
+      "bbox": [
+        234,
+        439,
+        264,
+        451
+      ],
+      "crop_filename": "page_68_crop_11_Discount.png",
+      "recognized_text": "[TEXT_30x12]"
+    },
+    {
+      "crop_id": 12,
+      "class_name": "Price",
+      "confidence": 0.412,
+      "bbox": [
+        165,
+        685,
+        196,
+        696
+      ],
+      "crop_filename": "page_68_crop_12_Price.png",
+      "recognized_text": "[TEXT_31x11]"
+    },
+    {
+      "crop_id": 13,
+      "class_name": "Weight",
+      "confidence": 0.3995,
+      "bbox": [
+        97,
+        385,
+        138,
+        421
+      ],
+      "crop_filename": "page_68_crop_13_Weight.png",
+      "recognized_text": "[TEXT_41x36]"
+    },
+    {
+      "crop_id": 14,
+      "class_name": "Weight",
+      "confidence": 0.27,
+      "bbox": [
+        98,
+        421,
+        127,
+        433
+      ],
+      "crop_filename": "page_68_crop_14_Weight.png",
+      "recognized_text": "[TEXT_29x12]"
+    }
+  ]
+}

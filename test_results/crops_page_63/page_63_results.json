@@ -1,0 +1,618 @@
+{
+  "original_image": "test_results\\crops_page_63\\page_63_original.png",
+  "annotated_image": "test_results\\crops_page_63\\page_63_annotated.png",
+  "total_crops": 47,
+  "crops": [
+    {
+      "crop_id": 0,
+      "class_name": "Discount",
+      "confidence": 0.9484,
+      "bbox": [
+        236,
+        486,
+        276,
+        511
+      ],
+      "crop_filename": "page_63_crop_00_Discount.png",
+      "recognized_text": "[TEXT_40x25]"
+    },
+    {
+      "crop_id": 1,
+      "class_name": "Discount",
+      "confidence": 0.9481,
+      "bbox": [
+        106,
+        656,
+        144,
+        680
+      ],
+      "crop_filename": "page_63_crop_01_Discount.png",
+      "recognized_text": "[TEXT_38x24]"
+    },
+    {
+      "crop_id": 2,
+      "class_name": "Name",
+      "confidence": 0.9418,
+      "bbox": [
+        304,
+        320,
+        361,
+        354
+      ],
+      "crop_filename": "page_63_crop_02_Name.png",
+      "recognized_text": "[TEXT_57x34]"
+    },
+    {
+      "crop_id": 3,
+      "class_name": "Discount",
+      "confidence": 0.9382,
+      "bbox": [
+        237,
+        323,
+        275,
+        346
+      ],
+      "crop_filename": "page_63_crop_03_Discount.png",
+      "recognized_text": "[TEXT_38x23]"
+    },
+    {
+      "crop_id": 4,
+      "class_name": "Discount",
+      "confidence": 0.9321,
+      "bbox": [
+        237,
+        656,
+        275,
+        680
+      ],
+      "crop_filename": "page_63_crop_04_Discount.png",
+      "recognized_text": "[TEXT_38x24]"
+    },
+    {
+      "crop_id": 5,
+      "class_name": "Discount",
+      "confidence": 0.927,
+      "bbox": [
+        106,
+        158,
+        144,
+        182
+      ],
+      "crop_filename": "page_63_crop_05_Discount.png",
+      "recognized_text": "[TEXT_38x24]"
+    },
+    {
+      "crop_id": 6,
+      "class_name": "Discount",
+      "confidence": 0.9239,
+      "bbox": [
+        244,
+        158,
+        279,
+        182
+      ],
+      "crop_filename": "page_63_crop_06_Discount.png",
+      "recognized_text": "[TEXT_35x24]"
+    },
+    {
+      "crop_id": 7,
+      "class_name": "Discount",
+      "confidence": 0.9205,
+      "bbox": [
+        390,
+        170,
+        423,
+        184
+      ],
+      "crop_filename": "page_63_crop_07_Discount.png",
+      "recognized_text": "[TEXT_33x14]"
+    },
+    {
+      "crop_id": 8,
+      "class_name": "Discount",
+      "confidence": 0.9158,
+      "bbox": [
+        392,
+        498,
+        423,
+        511
+      ],
+      "crop_filename": "page_63_crop_08_Discount.png",
+      "recognized_text": "[TEXT_31x13]"
+    },
+    {
+      "crop_id": 9,
+      "class_name": "Price",
+      "confidence": 0.9154,
+      "bbox": [
+        231,
+        520,
+        273,
+        541
+      ],
+      "crop_filename": "page_63_crop_09_Price.png",
+      "recognized_text": "[TEXT_42x21]"
+    },
+    {
+      "crop_id": 10,
+      "class_name": "Name",
+      "confidence": 0.9071,
+      "bbox": [
+        19,
+        342,
+        57,
+        355
+      ],
+      "crop_filename": "page_63_crop_10_Name.png",
+      "recognized_text": "[TEXT_38x13]"
+    },
+    {
+      "crop_id": 11,
+      "class_name": "Price",
+      "confidence": 0.9067,
+      "bbox": [
+        98,
+        192,
+        142,
+        212
+      ],
+      "crop_filename": "page_63_crop_11_Price.png",
+      "recognized_text": "[TEXT_44x20]"
+    },
+    {
+      "crop_id": 12,
+      "class_name": "Name",
+      "confidence": 0.9034,
+      "bbox": [
+        19,
+        168,
+        60,
+        190
+      ],
+      "crop_filename": "page_63_crop_12_Name.png",
+      "recognized_text": "[TEXT_41x22]"
+    },
+    {
+      "crop_id": 13,
+      "class_name": "Price",
+      "confidence": 0.9019,
+      "bbox": [
+        230,
+        356,
+        273,
+        377
+      ],
+      "crop_filename": "page_63_crop_13_Price.png",
+      "recognized_text": "[TEXT_43x21]"
+    },
+    {
+      "crop_id": 14,
+      "class_name": "Name",
+      "confidence": 0.8906,
+      "bbox": [
+        161,
+        652,
+        222,
+        695
+      ],
+      "crop_filename": "page_63_crop_14_Name.png",
+      "recognized_text": "[TEXT_61x43]"
+    },
+    {
+      "crop_id": 15,
+      "class_name": "Name",
+      "confidence": 0.8899,
+      "bbox": [
+        304,
+        156,
+        350,
+        189
+      ],
+      "crop_filename": "page_63_crop_15_Name.png",
+      "recognized_text": "[TEXT_46x33]"
+    },
+    {
+      "crop_id": 16,
+      "class_name": "Discount",
+      "confidence": 0.8895,
+      "bbox": [
+        104,
+        329,
+        145,
+        347
+      ],
+      "crop_filename": "page_63_crop_16_Discount.png",
+      "recognized_text": "[TEXT_41x18]"
+    },
+    {
+      "crop_id": 17,
+      "class_name": "Price",
+      "confidence": 0.8862,
+      "bbox": [
+        373,
+        520,
+        421,
+        541
+      ],
+      "crop_filename": "page_63_crop_17_Price.png",
+      "recognized_text": "[TEXT_48x21]"
+    },
+    {
+      "crop_id": 18,
+      "class_name": "Discount",
+      "confidence": 0.8847,
+      "bbox": [
+        391,
+        329,
+        423,
+        348
+      ],
+      "crop_filename": "page_63_crop_18_Discount.png",
+      "recognized_text": "[TEXT_32x19]"
+    },
+    {
+      "crop_id": 19,
+      "class_name": "Discount",
+      "confidence": 0.8807,
+      "bbox": [
+        106,
+        487,
+        143,
+        511
+      ],
+      "crop_filename": "page_63_crop_19_Discount.png",
+      "recognized_text": "[TEXT_37x24]"
+    },
+    {
+      "crop_id": 20,
+      "class_name": "Price",
+      "confidence": 0.8737,
+      "bbox": [
+        373,
+        191,
+        419,
+        213
+      ],
+      "crop_filename": "page_63_crop_20_Price.png",
+      "recognized_text": "[TEXT_46x22]"
+    },
+    {
+      "crop_id": 21,
+      "class_name": "Price",
+      "confidence": 0.8712,
+      "bbox": [
+        99,
+        521,
+        139,
+        541
+      ],
+      "crop_filename": "page_63_crop_21_Price.png",
+      "recognized_text": "[TEXT_40x20]"
+    },
+    {
+      "crop_id": 22,
+      "class_name": "Weight",
+      "confidence": 0.8671,
+      "bbox": [
+        18,
+        195,
+        62,
+        216
+      ],
+      "crop_filename": "page_63_crop_22_Weight.png",
+      "recognized_text": "[TEXT_44x21]"
+    },
+    {
+      "crop_id": 23,
+      "class_name": "Name",
+      "confidence": 0.8667,
+      "bbox": [
+        382,
+        414,
+        431,
+        448
+      ],
+      "crop_filename": "page_63_crop_23_Name.png",
+      "recognized_text": "[TEXT_49x34]"
+    },
+    {
+      "crop_id": 24,
+      "class_name": "Discount",
+      "confidence": 0.8666,
+      "bbox": [
+        391,
+        662,
+        423,
+        681
+      ],
+      "crop_filename": "page_63_crop_24_Discount.png",
+      "recognized_text": "[TEXT_32x19]"
+    },
+    {
+      "crop_id": 25,
+      "class_name": "Name",
+      "confidence": 0.8628,
+      "bbox": [
+        161,
+        468,
+        214,
+        503
+      ],
+      "crop_filename": "page_63_crop_25_Name.png",
+      "recognized_text": "[TEXT_53x35]"
+    },
+    {
+      "crop_id": 26,
+      "class_name": "Name",
+      "confidence": 0.8626,
+      "bbox": [
+        94,
+        410,
+        148,
+        433
+      ],
+      "crop_filename": "page_63_crop_26_Name.png",
+      "recognized_text": "[TEXT_54x23]"
+    },
+    {
+      "crop_id": 27,
+      "class_name": "Name",
+      "confidence": 0.8619,
+      "bbox": [
+        161,
+        167,
+        215,
+        190
+      ],
+      "crop_filename": "page_63_crop_27_Name.png",
+      "recognized_text": "[TEXT_54x23]"
+    },
+    {
+      "crop_id": 28,
+      "class_name": "Price",
+      "confidence": 0.8601,
+      "bbox": [
+        373,
+        690,
+        421,
+        712
+      ],
+      "crop_filename": "page_63_crop_28_Price.png",
+      "recognized_text": "[TEXT_48x22]"
+    },
+    {
+      "crop_id": 29,
+      "class_name": "Name",
+      "confidence": 0.859,
+      "bbox": [
+        161,
+        333,
+        218,
+        354
+      ],
+      "crop_filename": "page_63_crop_29_Name.png",
+      "recognized_text": "[TEXT_57x21]"
+    },
+    {
+      "crop_id": 30,
+      "class_name": "Price",
+      "confidence": 0.8543,
+      "bbox": [
+        100,
+        356,
+        142,
+        377
+      ],
+      "crop_filename": "page_63_crop_30_Price.png",
+      "recognized_text": "[TEXT_42x21]"
+    },
+    {
+      "crop_id": 31,
+      "class_name": "Price",
+      "confidence": 0.8321,
+      "bbox": [
+        236,
+        191,
+        280,
+        212
+      ],
+      "crop_filename": "page_63_crop_31_Price.png",
+      "recognized_text": "[TEXT_44x21]"
+    },
+    {
+      "crop_id": 32,
+      "class_name": "Weight",
+      "confidence": 0.8296,
+      "bbox": [
+        161,
+        698,
+        216,
+        715
+      ],
+      "crop_filename": "page_63_crop_32_Weight.png",
+      "recognized_text": "[TEXT_55x17]"
+    },
+    {
+      "crop_id": 33,
+      "class_name": "Price",
+      "confidence": 0.8285,
+      "bbox": [
+        97,
+        690,
+        143,
+        711
+      ],
+      "crop_filename": "page_63_crop_33_Price.png",
+      "recognized_text": "[TEXT_46x21]"
+    },
+    {
+      "crop_id": 34,
+      "class_name": "Price",
+      "confidence": 0.7829,
+      "bbox": [
+        227,
+        690,
+        276,
+        711
+      ],
+      "crop_filename": "page_63_crop_34_Price.png",
+      "recognized_text": "[TEXT_49x21]"
+    },
+    {
+      "crop_id": 35,
+      "class_name": "Name",
+      "confidence": 0.7801,
+      "bbox": [
+        304,
+        657,
+        343,
+        681
+      ],
+      "crop_filename": "page_63_crop_35_Name.png",
+      "recognized_text": "[TEXT_39x24]"
+    },
+    {
+      "crop_id": 36,
+      "class_name": "Name",
+      "confidence": 0.7577,
+      "bbox": [
+        17,
+        656,
+        72,
+        680
+      ],
+      "crop_filename": "page_63_crop_36_Name.png",
+      "recognized_text": "[TEXT_55x24]"
+    },
+    {
+      "crop_id": 37,
+      "class_name": "Price",
+      "confidence": 0.7077,
+      "bbox": [
+        377,
+        357,
+        416,
+        377
+      ],
+      "crop_filename": "page_63_crop_37_Price.png",
+      "recognized_text": "[TEXT_39x20]"
+    },
+    {
+      "crop_id": 38,
+      "class_name": "Weight",
+      "confidence": 0.6759,
+      "bbox": [
+        161,
+        198,
+        196,
+        217
+      ],
+      "crop_filename": "page_63_crop_38_Weight.png",
+      "recognized_text": "[TEXT_35x19]"
+    },
+    {
+      "crop_id": 39,
+      "class_name": "Date",
+      "confidence": 0.6112,
+      "bbox": [
+        134,
+        8,
+        316,
+        31
+      ],
+      "crop_filename": "page_63_crop_39_Date.png",
+      "recognized_text": "[TEXT_182x23]"
+    },
+    {
+      "crop_id": 40,
+      "class_name": "Weight",
+      "confidence": 0.5929,
+      "bbox": [
+        304,
+        364,
+        338,
+        380
+      ],
+      "crop_filename": "page_63_crop_40_Weight.png",
+      "recognized_text": "[TEXT_34x16]"
+    },
+    {
+      "crop_id": 41,
+      "class_name": "Weight",
+      "confidence": 0.4946,
+      "bbox": [
+        303,
+        197,
+        362,
+        217
+      ],
+      "crop_filename": "page_63_crop_41_Weight.png",
+      "recognized_text": "[TEXT_59x20]"
+    },
+    {
+      "crop_id": 42,
+      "class_name": "Weight",
+      "confidence": 0.444,
+      "bbox": [
+        304,
+        686,
+        345,
+        710
+      ],
+      "crop_filename": "page_63_crop_42_Weight.png",
+      "recognized_text": "[TEXT_41x24]"
+    },
+    {
+      "crop_id": 43,
+      "class_name": "Weight",
+      "confidence": 0.4247,
+      "bbox": [
+        304,
+        190,
+        363,
+        215
+      ],
+      "crop_filename": "page_63_crop_43_Weight.png",
+      "recognized_text": "[TEXT_59x25]"
+    },
+    {
+      "crop_id": 44,
+      "class_name": "Weight",
+      "confidence": 0.4053,
+      "bbox": [
+        303,
+        694,
+        345,
+        715
+      ],
+      "crop_filename": "page_63_crop_44_Weight.png",
+      "recognized_text": "[TEXT_42x21]"
+    },
+    {
+      "crop_id": 45,
+      "class_name": "Weight",
+      "confidence": 0.3702,
+      "bbox": [
+        161,
+        359,
+        219,
+        380
+      ],
+      "crop_filename": "page_63_crop_45_Weight.png",
+      "recognized_text": "[TEXT_58x21]"
+    },
+    {
+      "crop_id": 46,
+      "class_name": "Weight",
+      "confidence": 0.2664,
+      "bbox": [
+        304,
+        202,
+        358,
+        216
+      ],
+      "crop_filename": "page_63_crop_46_Weight.png",
+      "recognized_text": "[TEXT_54x14]"
+    }
+  ]
+}

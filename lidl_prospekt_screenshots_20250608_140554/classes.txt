@@ -1,5 +1,0 @@
-product_name
-price
-weight
-promo
-description
