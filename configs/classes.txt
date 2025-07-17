@@ -1,6 +1,1 @@
-#product_name
-#price
-#weight
-#promo
-#date
 product

@@ -4,9 +4,4 @@ val: train
 
 # Classes
 names:
-  0: Name
-  1: Price
-  2: Weight
-  3: Discount
-  4: Date
-  5: Product
+  0: Product

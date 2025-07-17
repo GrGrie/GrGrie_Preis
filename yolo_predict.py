@@ -4,7 +4,7 @@ from ultralytics import YOLO
 import torch
 import argparse
 import os
-from bbox_grouper import ProductGrouper  # Import the grouper
+# from bbox_grouper import ProductGrouper  # Import the grouper
 import shutil
 import cv2
 import json
@@ -12,13 +12,15 @@ from datetime import datetime
 
 def main():
     parser = argparse.ArgumentParser(description="YOLOv11 Training Model")
-    parser.add_argument("--data", type=str, default="configs/dataset.yaml", help="Path to dataset config file")
+    parser.add_argument("--config", type=str, default="configs/dataset.yaml", help="Path to dataset config file")
     parser.add_argument("--num_epochs", type=int, default=50, help="Number of training epochs")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of workers for data loading")
     parser.add_argument("--image_size", type=int, default=640, choices=[320, 640, 1280], help="Image size")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
-    parser.add_argument("--weights", type=str, default="yolo11n.pt", help="Path to pretrained weights file")
     parser.add_argument("--test_grouping", action="store_true", help="Test grouping after training")
+    parser.add_argument("--name", type=str, default="latest_yolo_run", help="Name of the training run")
+    
+    # Evaluation parameters
     parser.add_argument("--eval", action="store_true", help="Run in evaluation mode (no training)")
     parser.add_argument("--eval_model", type=str, help="Path to trained model for evaluation")
     parser.add_argument("--eval_data", type=str, help="Path to folder containing images for evaluation")
@@ -43,7 +45,8 @@ def main():
         raise ValueError("Train, validation, and test ratios must sum to 1.0")
 
     print("Starting YOLOv11 training.." if not args.eval else "Starting YOLOv11 evaluation..")
-
+    print(f"Using dataset config: {args.config}")
+    
     # Handle evaluation mode
     if args.eval:
         if not args.eval_model:
@@ -59,11 +62,11 @@ def main():
     prepare_global_dataset(args.train_ratio, args.val_ratio, args.test_ratio)
 
     # Load pretrained model
-    model = YOLO(args.weights)
+    model = YOLO("yolo11n.pt")
 
     # Start training
     results = model.train(
-        data=args.data,
+        data=args.config,
         epochs=args.num_epochs,
         imgsz=args.image_size,
         batch=args.batch_size,
@@ -76,16 +79,13 @@ def main():
         momentum=args.momentum,
         weight_decay=args.weight_decay,
         project=args.save_dir,
-        name='lidl_products_v1',
+        name=args.name,
         exist_ok=True,
     )
     
     print("Training completed!")
-    print(f"Best model saved at: {args.save_dir}/lidl_products_v1/weights/best.pt")
-    
-    # Test grouping functionality
-    if args.test_grouping:
-        test_grouping(f"{args.save_dir}/lidl_products_v1/weights/best.pt")
+    best_model_path = os.path.join(args.save_dir, args.name, 'weights', 'best.pt')
+    print(f"Best model saved at: {best_model_path}")
 
 def evaluate_model(model_path, data_path, conf_threshold=0.25):
     """
@@ -107,12 +107,15 @@ def evaluate_model(model_path, data_path, conf_threshold=0.25):
     eval_results_dir = Path("eval-results")
     eval_results_dir.mkdir(exist_ok=True)
     
+    # Create crops directory
+    crops_dir = eval_results_dir / "crops"
+    crops_dir.mkdir(exist_ok=True)
+    
     # Get all image files
     image_extensions = ['*.png', '*.jpg', '*.jpeg', '*.bmp', '*.tiff']
     image_files = []
     for ext in image_extensions:
         image_files.extend(data_dir.glob(ext))
-        image_files.extend(data_dir.glob(ext.upper()))
     
     if not image_files:
         raise ValueError(f"No image files found in '{data_path}'")
@@ -122,6 +125,8 @@ def evaluate_model(model_path, data_path, conf_threshold=0.25):
     # Initialize results storage
     all_detections = []
     results_txt_path = eval_results_dir / "detections.txt"
+    crop_counter = 0  # Global counter for unique crop naming
+
     
     # Process each image
     for i, img_path in enumerate(image_files):
@@ -158,6 +163,22 @@ def evaluate_model(model_path, data_path, conf_threshold=0.25):
                     width_norm = float(boxes.xywhn[j][2])
                     height_norm = float(boxes.xywhn[j][3])
                     
+                    # Crop the detected product
+                    crop_counter += 1
+                    crop_filename = f"crop_{crop_counter:04d}_{img_path.stem}_conf{confidence:.2f}.png"
+                    crop_path = crops_dir / crop_filename
+                    
+                    # Ensure coordinates are within image bounds
+                    x1_crop = max(0, x1)
+                    y1_crop = max(0, y1)
+                    x2_crop = min(img_width, x2)
+                    y2_crop = min(img_height, y2)
+                    
+                    if x2_crop > x1_crop and y2_crop > y1_crop:
+                        cropped_img = img[y1_crop:y2_crop, x1_crop:x2_crop]
+                        cv2.imwrite(str(crop_path), cropped_img)
+                        print(f"    Saved crop: {crop_filename}")
+                    
                     # Store detection info
                     detection_info = {
                         'image_name': img_path.name,
@@ -169,7 +190,8 @@ def evaluate_model(model_path, data_path, conf_threshold=0.25):
                         'x_center_norm': x_center_norm,
                         'y_center_norm': y_center_norm,
                         'width_norm': width_norm,
-                        'height_norm': height_norm
+                        'height_norm': height_norm,
+                        'crop_filename': crop_filename  # Add crop filename to detection info
                     }
                     
                     image_detections.append(detection_info)
@@ -192,105 +214,14 @@ def evaluate_model(model_path, data_path, conf_threshold=0.25):
         
         print(f"  Found {len(image_detections)} detections")
     
-    # Save all detections to text file
-    print(f"Saving detection results to: {results_txt_path}")
-    with open(results_txt_path, 'w') as f:
-        # Write header
-        f.write("# YOLO Model Evaluation Results\n")
-        f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"# Model: {model_path}\n")
-        f.write(f"# Data: {data_path}\n")
-        f.write(f"# Confidence threshold: {conf_threshold}\n")
-        f.write(f"# Total images processed: {len(image_files)}\n")
-        f.write(f"# Total detections: {len(all_detections)}\n")
-        f.write("#\n")
-        f.write("# Format: image_name,image_width,image_height,class_id,confidence,x1,y1,x2,y2,x_center_norm,y_center_norm,width_norm,height_norm\n")
-        f.write("#\n")
-        
-        # Write detections
-        for detection in all_detections:
-            line = (f"{detection['image_name']},{detection['image_width']},{detection['image_height']},"
-                   f"{detection['class_id']},{detection['confidence']:.4f},"
-                   f"{detection['x1']},{detection['y1']},{detection['x2']},{detection['y2']},"
-                   f"{detection['x_center_norm']:.6f},{detection['y_center_norm']:.6f},"
-                   f"{detection['width_norm']:.6f},{detection['height_norm']:.6f}\n")
-            f.write(line)
-    
+    # Save detections to text file
+    save_detections_to_txt(results_txt_path, model_path, data_path, conf_threshold, image_files, all_detections)
+
     # Create summary
     summary_path = eval_results_dir / "summary.txt"
-    with open(summary_path, 'w') as f:
-        f.write("EVALUATION SUMMARY\n")
-        f.write("=" * 50 + "\n")
-        f.write(f"Model: {model_path}\n")
-        f.write(f"Data: {data_path}\n")
-        f.write(f"Confidence threshold: {conf_threshold}\n")
-        f.write(f"Total images processed: {len(image_files)}\n")
-        f.write(f"Total detections: {len(all_detections)}\n")
-        f.write(f"Average detections per image: {len(all_detections)/len(image_files):.2f}\n")
-        
-        # Confidence distribution
-        if all_detections:
-            confidences = [d['confidence'] for d in all_detections]
-            f.write(f"Confidence - Min: {min(confidences):.3f}, Max: {max(confidences):.3f}, "
-                   f"Mean: {sum(confidences)/len(confidences):.3f}\n")
-        
-        f.write(f"\nResults saved in: {eval_results_dir.absolute()}\n")
-        f.write("- detected_*.png: Images with bounding boxes drawn\n")
-        f.write("- detections.txt: All detection data in CSV format\n")
-        f.write("- summary.txt: This summary file\n")
-    
-    print(f"\nEvaluation completed!")
-    print(f"Results saved in: {eval_results_dir.absolute()}")
-    print(f"- {len(image_files)} images processed")
-    print(f"- {len(all_detections)} total detections")
-    print(f"- Images with bounding boxes: detected_*.png")
-    print(f"- Detection data: detections.txt")
-    print(f"- Summary: summary.txt")
+    write_evaluation_summary(summary_path, model_path, data_path, conf_threshold, image_files, all_detections)
 
-def test_grouping(model_path):
-    """Test the grouping functionality on a sample image"""
-    model = YOLO(model_path)
-    grouper = ProductGrouper(proximity_threshold=0.15)
-    
-    # Test on a sample image from test set
-    test_images_dir = Path("data/test/images")
-    if test_images_dir.exists():
-        test_images = list(test_images_dir.glob("*.png"))
-        if test_images:
-            test_image = str(test_images[0])
-            results = model(test_image, conf=0.1)
-            
-            # Extract detections
-            detections = []
-            for result in results:
-                boxes = result.boxes
-                if boxes is not None:
-                    for i in range(len(boxes)):
-                        class_id = int(boxes.cls[i])
-                        x_center = float(boxes.xywhn[i][0])
-                        y_center = float(boxes.xywhn[i][1])
-                        width = float(boxes.xywhn[i][2])
-                        height = float(boxes.xywhn[i][3])
-                        confidence = float(boxes.conf[i])
-                        
-                        detections.append((class_id, x_center, y_center, width, height, confidence))
-            
-            # Group detections
-            groups = grouper.group_by_vertical_alignment(detections)
-            
-            print(f"\nFound {len(groups)} product groups:")
-            for i, group in enumerate(groups):
-                print(f"Group {i+1}:")
-                product_info = grouper.extract_product_info(group)
-                for key, value in product_info.items():
-                    if value is not None:
-                        print(f"  {key}: class={value[0]}, conf={value[5]:.2f}")
-        else:
-            print("No test images found for grouping test")
-    else:
-        print("Test images directory not found")
-
-def prepare_global_dataset(train_ratio=0.8, val_ratio=0.1, test_ratio=0.1):
+def prepare_global_dataset(train_ratio, val_ratio, test_ratio):
     """
     Aggregate all data from week folders and create global train/val/test split.
     Only class 5 (Product) labels are kept and converted to class 0.
@@ -375,12 +306,17 @@ def prepare_global_dataset(train_ratio=0.8, val_ratio=0.1, test_ratio=0.1):
         print(f"Copying {len(pairs)} files to {split_name} set...")
         
         for img_path, label_path in pairs:
+            # Make unique filename by prefixing with week folder name
+            week_prefix = img_path.parent.name  # e.g., '2025-06-09_2025-06-15'
+            unique_img_name = f"{week_prefix}_{img_path.name}"
+            unique_label_name = f"{week_prefix}_{label_path.name}"
+
             # Copy image
-            img_dest = data_dir / split_name / "images" / img_path.name
+            img_dest = data_dir / split_name / "images" / unique_img_name
             shutil.copy2(img_path, img_dest)
-            
+
             # Process and copy label (filter only class 5 and convert to class 0)
-            label_dest = data_dir / split_name / "labels" / label_path.name
+            label_dest = data_dir / split_name / "labels" / unique_label_name
             process_label_file(label_path, label_dest)
     
     print("Dataset preparation completed!")
@@ -427,6 +363,62 @@ def process_label_file(input_path, output_path):
                     fout.write("0 " + " ".join(parts[1:]) + "\n")
     except Exception as e:
         print(f"Error processing label file {input_path}: {e}")
+
+def write_evaluation_summary(summary_path, model_path, data_path, conf_threshold, image_files, all_detections):
+    """
+    Write a summary of the evaluation results.
+    
+    Args:
+        summary_path (Path): Path to save the summary file
+        model_path (str): Path to the trained model
+        data_path (str): Path to the evaluation data
+        conf_threshold (float): Confidence threshold used for evaluation
+        image_files (list): List of image files processed
+        all_detections (list): List of all detections made
+    """
+    with open(summary_path, 'w') as f:
+        f.write("EVALUATION SUMMARY\n")
+        f.write("=" * 50 + "\n")
+        f.write(f"Model: {model_path}\n")
+        f.write(f"Data: {data_path}\n")
+        f.write(f"Confidence threshold: {conf_threshold}\n")
+        f.write(f"Total images processed: {len(image_files)}\n")
+        f.write(f"Total detections: {len(all_detections)}\n")
+        
+        # Confidence distribution
+        if all_detections:
+            confidences = [d['confidence'] for d in all_detections]
+            f.write(f"Confidence - Min: {min(confidences):.3f}, Max: {max(confidences):.3f}, "
+                   f"Mean: {sum(confidences)/len(confidences):.3f}\n")
+        
+        f.write(f"\nResults saved in: {summary_path.parent.absolute()}\n")
+        f.write("- detected_*.png: Images with bounding boxes drawn\n")
+        f.write("- detections.txt: All detection data in CSV format\n")
+        f.write("- summary.txt: This summary file\n")
+
+def save_detections_to_txt(results_txt_path, model_path, data_path, conf_threshold, image_files, all_detections):
+    """
+    Save all detection results to a text file.
+    
+    Args:
+        results_txt_path (Path): Path to save the results text file
+        model_path (str): Path to the trained model
+        data_path (str): Path to the evaluation data
+        conf_threshold (float): Confidence threshold used for evaluation
+        image_files (list): List of image files processed
+        all_detections (list): List of all detections made
+    """
+    print(f"Saving detection results to: {results_txt_path}")
+    with open(results_txt_path, 'w') as f:
+        # Write header
+        f.write("# YOLO Model Evaluation Results\n")
+        f.write(f"# Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"# Model: {model_path}\n")
+        f.write(f"# Data: {data_path}\n")
+        f.write(f"# Confidence threshold: {conf_threshold}\n")
+        f.write(f"# Total images processed: {len(image_files)}\n")
+        f.write(f"# Total detections: {len(all_detections)}\n")
+        f.write("#\n")
 
 if __name__ == "__main__":
     main()
