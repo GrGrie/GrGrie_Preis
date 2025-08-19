@@ -22,7 +22,7 @@ def main():
     
     # Evaluation parameters
     parser.add_argument("--eval", action="store_true", help="Run in evaluation mode (no training)")
-    parser.add_argument("--eval_model", type=str, help="Path to trained model for evaluation")
+    parser.add_argument("--eval_model", type=str, default="runs/detect/latest_yolo_run/weights/best.pt", help="Path to trained model for evaluation")
     parser.add_argument("--eval_data", type=str, help="Path to folder containing images for evaluation")
     parser.add_argument("--eval_conf", type=float, default=0.25, help="Confidence threshold for evaluation")
     
@@ -49,11 +49,9 @@ def main():
     
     # Handle evaluation mode
     if args.eval:
-        if not args.eval_model:
-            raise ValueError("--eval_model is required when using --eval mode")
         if not args.eval_data:
             # Default to test set if no specific data provided
-            args.eval_data = "data/test/images"
+            raise ValueError("--eval_data is required when using evaluation mode")
         
         evaluate_model(args.eval_model, args.eval_data, args.eval_conf)
         return
@@ -62,7 +60,7 @@ def main():
     prepare_global_dataset(args.train_ratio, args.val_ratio, args.test_ratio)
 
     # Load pretrained model
-    model = YOLO("yolo11n.pt")
+    model = YOLO("yolo11m.pt")
 
     # Start training
     results = model.train(
@@ -87,7 +85,7 @@ def main():
     best_model_path = os.path.join(args.save_dir, args.name, 'weights', 'best.pt')
     print(f"Best model saved at: {best_model_path}")
 
-def evaluate_model(model_path, data_path, conf_threshold=0.25):
+def evaluate_model(model_path = "runs/detect/latest_yolo_run/weights/best.pt", data_path="", conf_threshold=0.25):
     """
     Evaluate a trained YOLO model on images and save results.
     
@@ -142,7 +140,8 @@ def evaluate_model(model_path, data_path, conf_threshold=0.25):
             continue
         
         img_height, img_width = img.shape[:2]
-        
+        img_for_crops = img.copy()  # Use this for cropping, keep 'img' for drawing
+
         # Process detections
         image_detections = []
         for result in results:
@@ -165,7 +164,7 @@ def evaluate_model(model_path, data_path, conf_threshold=0.25):
                     
                     # Crop the detected product
                     crop_counter += 1
-                    crop_filename = f"crop_{crop_counter:04d}_{img_path.stem}_conf{confidence:.2f}.png"
+                    crop_filename = f"crop{crop_counter:03d}_{img_path.stem}.png"
                     crop_path = crops_dir / crop_filename
                     
                     # Ensure coordinates are within image bounds
@@ -175,7 +174,7 @@ def evaluate_model(model_path, data_path, conf_threshold=0.25):
                     y2_crop = min(img_height, y2)
                     
                     if x2_crop > x1_crop and y2_crop > y1_crop:
-                        cropped_img = img[y1_crop:y2_crop, x1_crop:x2_crop]
+                        cropped_img = img_for_crops[y1_crop:y2_crop, x1_crop:x2_crop]
                         cv2.imwrite(str(crop_path), cropped_img)
                         print(f"    Saved crop: {crop_filename}")
                     
