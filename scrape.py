@@ -99,12 +99,7 @@ def main():
     if not url:
         print("No URLs provided to scrape. Exiting.")
         return
-
-    # Scrape URL
-    print(f"\n{'='*50}")
-    print(f"Scraping: {url}")
-    print(f"{'='*50}")
-
+    
     try:
         scraper = ScraperFactory.create_scraper(url, driver_manager, image_downloader, config.config)
         results = scraper.scrape(url, config.config['download_path'], args.num_prospekt)
