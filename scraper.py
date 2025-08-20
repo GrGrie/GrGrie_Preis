@@ -90,8 +90,8 @@ class BaseScraper(ABC):
         pass
     
     @abstractmethod
-    def find_prospekt_links(self, driver) -> List[str]:
-        """Find and return prospekt/flyer links"""
+    def find_prospekt_links(self, driver) -> List[Tuple[str, str]]:
+        """Find and return (name, url) tuples for available prospekts"""
         pass
     
     @abstractmethod
@@ -112,6 +112,17 @@ class BaseScraper(ABC):
     def get_week_dates(self, driver) -> Optional[str]:
         """Extract week dates from the page, return in YYYY-MM-DD_YYYY-MM-DD format"""
         return None  # Default implementation returns None
+
+    def select_prospekt(self, prospekt_links: List[Tuple[str, str]], index: int) -> str:
+        """Return the URL of the prospekt specified by a 1-based index"""
+        if not prospekt_links:
+            raise ValueError("No prospekt links available")
+        if index < 1 or index > len(prospekt_links):
+            print(f"⚠ Invalid prospekt index {index}, defaulting to 1")
+            index = 1
+        name, url = prospekt_links[index - 1]
+        print(f"Using prospekt #{index}: {name}")
+        return url
     
     def setup_driver(self):
         """Setup and return driver"""
@@ -181,7 +192,7 @@ class BaseScraper(ABC):
         
         return downloaded_images
     
-    def scrape(self, url: str, download_path: str = "data/originals", num_prospekt: int = 1) -> Dict:
+    def scrape(self, url: str, download_path: str = "data/originals", prospekt_index: int = 1) -> Dict:
         """Main scraping method"""
         results = {
             'success': False,
@@ -204,10 +215,14 @@ class BaseScraper(ABC):
             if not prospekt_links:
                 results['error'] = "Could not find any prospekt links"
                 return results
-            
-            # Use requested prospekt link
-            prospekt_url = prospekt_links[num_prospekt - 1] if num_prospekt > 0 else prospekt_links[0]
-            
+
+            print("Available prospekts:")
+            for idx, (name, link) in enumerate(prospekt_links, 1):
+                print(f"  {idx}. {name} - {link}")
+
+            # Choose prospekt
+            prospekt_url = self.select_prospekt(prospekt_links, prospekt_index)
+
             # Open prospekt
             if prospekt_url != url:  # Only navigate if it's a different URL
                 driver.get(prospekt_url)
@@ -271,7 +286,7 @@ class LidlScraper(BaseScraper):
         except TimeoutException:
             print("No store selection popup found")
     
-    def find_prospekt_links(self, driver) -> List[str]:
+    def find_prospekt_links(self, driver) -> List[Tuple[str, str]]:
         """Find Lidl prospekt links"""
         selectors = [
             "a.flyer[data-track-name='Aktionsprospekt']",
@@ -280,7 +295,7 @@ class LidlScraper(BaseScraper):
             ".flyer"
         ]
         
-        links = []
+        links: List[Tuple[str, str]] = []
         for selector in selectors:
             try:
                 elements = WebDriverWait(driver, 5).until(
@@ -288,14 +303,15 @@ class LidlScraper(BaseScraper):
                 )
                 for element in elements:
                     href = element.get_attribute("href")
-                    if href and href not in links:
-                        links.append(href)
-                        print(f"✓ Found prospekt: {element.get_attribute('data-track-name') or 'Unknown'}")
+                    name = element.get_attribute('data-track-name') or element.text or 'Prospekt'
+                    if href and not any(href == l[1] for l in links):
+                        links.append((name.strip(), href))
+                        print(f"✓ Found prospekt: {name}")
                 if links:
                     break
             except TimeoutException:
                 continue
-        
+
         return links
     
     def get_high_res_image_url(self, img_element) -> Optional[str]:
@@ -386,7 +402,7 @@ class AngeboteScraper(BaseScraper):
         except TimeoutException:
             print("No cookie banner found")
     
-    def find_prospekt_links(self, driver) -> List[str]:
+    def find_prospekt_links(self, driver) -> List[Tuple[str, str]]:
         """Find prospekt links on angebote.com"""
         # This would need to be implemented based on angebote.com's structure
         selectors = [
@@ -396,8 +412,8 @@ class AngeboteScraper(BaseScraper):
             ".prospekt-link",
             ".flyer-link"
         ]
-        
-        links = []
+
+        links: List[Tuple[str, str]] = []
         for selector in selectors:
             try:
                 elements = WebDriverWait(driver, 5).until(
@@ -405,14 +421,15 @@ class AngeboteScraper(BaseScraper):
                 )
                 for element in elements:
                     href = element.get_attribute("href")
-                    if href and href not in links:
-                        links.append(href)
+                    name = element.text or 'Prospekt'
+                    if href and not any(href == l[1] for l in links):
+                        links.append((name.strip(), href))
                         print(f"✓ Found prospekt: {href}")
                 if links:
                     break
             except TimeoutException:
                 continue
-        
+
         return links
     
     def get_week_dates(self, driver) -> Optional[str]:
@@ -553,7 +570,9 @@ def main():
                        help='Download path for images')
     parser.add_argument('--list-sites', action='store_true',
                        help='List available predefined sites')
-    parser.add_argument('--num_prospekt', '--num_prospekt', type=int, default=1, help='Number of prospekt to scrape (1-based index)')
+    parser.add_argument('--prospekt-index', '--num_prospekt', '--num-prospekt',
+                        type=int, default=1,
+                        help='Which prospekt to download (1-based index)')
 
     args = parser.parse_args()
     
@@ -597,7 +616,7 @@ def main():
         
         try:
             scraper = ScraperFactory.create_scraper(url, driver_manager, image_downloader)
-            results = scraper.scrape(url, config.config['download_path'], args.num_prospekt)
+            results = scraper.scrape(url, config.config['download_path'], args.prospekt_index)
             
             if results['success']:
                 print(f"✓ Successfully scraped {len(results['downloaded_images'])} images")
