@@ -4,10 +4,8 @@ from ultralytics import YOLO
 import torch
 import argparse
 import os
-# from bbox_grouper import ProductGrouper  # Import the grouper
 import shutil
 import cv2
-import json
 from datetime import datetime
 
 def main():

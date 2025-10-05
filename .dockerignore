@@ -1,0 +1,15 @@
+.git
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.ipynb
+data/
+datasets/
+models/*
+!models/best.pt
+outputs/
+runs/
+.cache/
+.poetry/

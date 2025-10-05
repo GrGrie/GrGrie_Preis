@@ -1,0 +1,12 @@
+<!doctype html><html><body>
+<h2>Run scraping and interference</h2>
+<form method="post" action="/run">
+  <label>site:</label><input name="site" value="lidl"/>
+  <label>conf:</label><input name="conf" value="0.25"/>
+  <button type="submit">Go</button>
+</form>
+<h3>Last runs:</h3>
+<ul>
+  {% for r in runs %}<li><a href="/runs/{{r}}">{{r}}</a></li>{% endfor %}
+</ul>
+</body></html>

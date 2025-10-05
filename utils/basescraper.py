@@ -1,6 +1,6 @@
-from utils.directory_manager import DirectoryManager
-from utils.web_driver_manager import WebDriverManager
-from utils.image_downloader import ImageDownloader
+from utils.utils import DirectoryManager
+from utils.utils import WebDriverManager
+from utils.utils import ImageDownloader
 
 from abc import ABC, abstractmethod
 from typing import List, Tuple, Optional, Dict
@@ -140,9 +140,8 @@ class BaseScraper(ABC):
             'error': None
         }
         
-        driver = self.setup_driver()
-        
         try:
+            driver = self.setup_driver()
             # print(f"[DEBUG] Opening {url}...")
             driver.get(url)
             

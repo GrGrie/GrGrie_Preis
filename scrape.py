@@ -3,8 +3,8 @@ import argparse
 import json
 from typing import Dict
 
-from utils.image_downloader import ImageDownloader
-from utils.web_driver_manager import WebDriverManager
+from utils.utils import ImageDownloader
+from utils.utils import WebDriverManager
 from utils.scrapers import ScraperFactory 
 
 # Configuration management
@@ -67,8 +67,8 @@ def main():
     parser.add_argument('--url', '-u', type=str, help='URL to scrape')
     parser.add_argument('--site', '-s', type=str, choices=['lidl', 'angebote'], 
                        help='Predefined site to scrape')
-    parser.add_argument('--headless', action='store_true', default=True,
-                       help='Run browser in headless mode')
+    parser.add_argument('--no-headless', action='store_false',
+                       help='Run browser in no-headless mode (default is headless)')
     parser.add_argument('--download-path', '-d', type=str, 
                        help='Download path for images')
     parser.add_argument('--num_prospekt', '--num-prospekt',
@@ -81,9 +81,8 @@ def main():
     config = ScraperConfig()
     
     # Override config with command line arguments
-    if args.headless is not True:
-        config.config['headless'] = False
-    
+    config.config['headless'] = args.no_headless if not args.no_headless else True
+
     if args.download_path:
         config.config['download_path'] = args.download_path
     
