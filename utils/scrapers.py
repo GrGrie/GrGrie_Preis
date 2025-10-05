@@ -6,8 +6,8 @@ from selenium.webdriver.common.by import By
 import time
 from typing import List, Tuple, Optional
 
-from utils.web_driver_manager import WebDriverManager
-from utils.image_downloader import ImageDownloader
+from utils.utils import WebDriverManager
+from utils.utils import ImageDownloader
 
 class LidlScraper(BaseScraper):
     """Scraper implementation for Lidl website"""
