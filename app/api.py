@@ -1,16 +1,21 @@
+import os
 from pathlib import Path
 from fastapi import FastAPI, BackgroundTasks, Form, Request, UploadFile, File
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from app.config import ensure_dirs, RUNS_DIR
 from app.pipeline import run_once
 from app.yolo_service import YoloService
 import json
 
+#  Directory to save inference results (images with boxes, labels, etc.)
+RUNS_DIR = Path(os.getenv("RUNS_DIR", "static/runs")).resolve()
+RUNS_DIR.mkdir(parents=True, exist_ok=True)
 BASE_DIR = Path(__file__).resolve().parent.parent
-app = FastAPI(title="Booklet API", version="0.2.0")
-ensure_dirs()
+
+
+
+app = FastAPI(title="GrGrie_Preis API", version="0.2.0")
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))

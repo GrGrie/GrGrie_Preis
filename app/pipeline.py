@@ -1,8 +1,13 @@
+import os
 import json, shutil, time, uuid, subprocess
 from pathlib import Path
 from PIL import Image
-from app.config import DATA_ORIGINALS, RUNS_DIR
 from app.yolo_service import YoloService
+
+#  Directory to save inference results (images with boxes, labels, etc.)
+RUNS_DIR = Path(os.getenv("RUNS_DIR", "static/runs")).resolve()
+# Do not change this file directly, use environment variables instead.
+DATA_ORIGINALS = Path(os.getenv("DATA_ORIGINALS", "data/originals")).resolve()
 
 def _new_run_dir() -> Path:
     run_id = time.strftime("%Y-%m-%d_%H-%M-%S_") + uuid.uuid4().hex[:6]

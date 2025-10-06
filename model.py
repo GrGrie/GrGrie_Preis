@@ -19,7 +19,7 @@ def main():
     parser.add_argument("--name", type=str, default="latest_yolo_run", help="Name of the training run")
     
     # Evaluation parameters
-    parser.add_argument("--eval", action="store_true", help="Run in evaluation mode (no training)")
+    parser.add_argument("--eval", action="store_true", help="Run in inference mode")
     parser.add_argument("--eval_model", type=str, default="runs/detect/latest_yolo_run/weights/best.pt", help="Path to trained model for evaluation")
     parser.add_argument("--eval_data", type=str, help="Path to folder containing images for evaluation")
     parser.add_argument("--eval_conf", type=float, default=0.25, help="Confidence threshold for evaluation")
@@ -35,7 +35,7 @@ def main():
     parser.add_argument("--weight_decay", type=float, default=0.0005, help="Weight decay for optimizer")
     parser.add_argument("--patience", type=int, default=20, help="Early stopping patience")
     parser.add_argument("--save_period", type=int, default=10, help="Model save period every N epochs")
-    parser.add_argument("--save_dir", type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "runs", "detect"), help="Directory to save trained models")
+    parser.add_argument("--save_dir", type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "runs", "yolo_training"), help="Directory to save trained models")
     args = parser.parse_args()
 
     # Validate split ratios
