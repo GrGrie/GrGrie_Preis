@@ -1,8 +1,10 @@
-import os, sys, json, shutil, time, uuid, subprocess
+import os, sys, json, time, uuid, subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from PIL import Image
 from ultralytics import YOLO
+from app.ocr import ocr_folder
+
 
 #  Directory to save inference results (images with boxes, labels, etc.)
 RUNS_DIR = Path(os.getenv("RUNS_DIR", "static/runs")).resolve()
@@ -99,6 +101,12 @@ def run_once(site: str = "lidl", conf: float = 0.25, num_prospekt: int = 1) -> d
                 "box": d["box"]
             })
 
-    meta = {"run_id": run_dir.name, "site": site, "count": len(items), "items": items}
+     # NEW: OCR over crops
+    ocr_json = run_dir / "ocr.json"
+    ocr_csv  = run_dir / "ocr.csv"
+    ocr_info = ocr_folder(crops_dir, ocr_json, ocr_csv)
+
+    meta = {"run_id": run_dir.name, "site": site, "count": len(items), "items": items,
+            "ocr": ocr_info}
     (run_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
     return meta
