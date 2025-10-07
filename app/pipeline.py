@@ -2,11 +2,28 @@ import os, sys, json, shutil, time, uuid, subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from PIL import Image
-from app.yolo_service import YoloService
+from ultralytics import YOLO
 
 #  Directory to save inference results (images with boxes, labels, etc.)
 RUNS_DIR = Path(os.getenv("RUNS_DIR", "static/runs")).resolve()
 DATA_ORIGINALS = Path(os.getenv("DATA_ORIGINALS", "static")).resolve()
+MODEL_PATH = "models/best.onnx"
+
+class YoloService:
+    def __init__(self, conf: float = 0.25):
+        self.conf = conf
+        self.model = YOLO(MODEL_PATH)
+        self.model.task = "detect"
+    
+    def predict_pil(self, img: Image.Image, conf: float | None = None):
+        results = self.model(img, conf=self.conf if conf is None else conf)
+        dets = []
+        for r in results:
+            if r.boxes is None: continue
+            for b in r.boxes:
+                x1,y1,x2,y2 = map(int, b.xyxy[0].tolist())
+                dets.append({"class_id": int(b.cls), "score": float(b.conf), "box": [x1,y1,x2,y2]})
+        return dets
 
 def _new_run_dir() -> Path:
     """Create a new unique run directory and return its Path"""
