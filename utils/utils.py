@@ -1,9 +1,12 @@
 import os
+
+import requests
 from datetime import datetime, timedelta
 from typing import Optional, Dict
-import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from ultralytics import YOLO
 
 
@@ -33,7 +36,6 @@ class ImageDownloader:
             print(f"Error downloading {url}: {e}")
             return False
 
-
 class DirectoryManager:
     """Manages directory creation and file paths"""
 
@@ -55,7 +57,6 @@ class DirectoryManager:
         os.makedirs(download_dir, exist_ok=True)
         return download_dir
 
-
 class WebDriverManager:
     """Manages WebDriver setup and configuration"""
 
@@ -64,14 +65,15 @@ class WebDriverManager:
         self.window_size = window_size
 
     def setup_driver(self):
-        """Setup Chrome driver with options"""
         options = Options()
         if self.headless:
-            options.add_argument("--headless")
+            # modern headless flag
+            options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument(f"--window-size={self.window_size}")
-        return webdriver.Chrome(options=options)
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=options)
 
 
 class ONNXExporter:

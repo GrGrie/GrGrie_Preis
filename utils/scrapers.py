@@ -87,9 +87,11 @@ class LidlScraper(BaseScraper):
                     url = url.replace('w_400', 'w_2000').replace('h_400', 'h_2000')
                     url = url.replace('w_600', 'w_2000').replace('h_600', 'h_2000')
                     url = url.replace('w_800', 'w_2000').replace('h_800', 'h_2000')
+                    print(f"[DEBUG] Enhanced resolution in URL (w_): {url}")
                 
                 if 'q_' in url:
                     url = url.replace('q_auto', 'q_100')
+                    print(f"[DEBUG] Enhanced quality in URL (q_): {url}")
                 
                 return url
         
@@ -163,9 +165,9 @@ class LidlScraper(BaseScraper):
         start = datetime(int(m.group(3)), int(m.group(2)), int(m.group(1)))
         end   = datetime(int(m.group(6)), int(m.group(5)), int(m.group(4)))
 
-        # OPTIONAL: Lidl links often end on Saturday. Extend to Sunday if you want full week.
-        if (end - start).days == 5:  # 6-day range (Mon–Sat)
-            end = end + timedelta(days=1)
+        # OPTIONAL: Lidl links often end on Saturday. Extend to Sunday if want full week.
+        #if (end - start).days == 5:  # 6-day range (Mon–Sat)
+            # end = end + timedelta(days=1)
 
         return f"{start:%Y-%m-%d}_{end:%Y-%m-%d}"
 class AngeboteScraper(BaseScraper):

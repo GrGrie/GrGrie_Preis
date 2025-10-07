@@ -6,8 +6,9 @@ MODEL_PATH = "models/best.onnx"
 
 class YoloService:
     def __init__(self, conf: float = 0.25):
-        self.model = YOLO(MODEL_PATH)
         self.conf = conf
+        self.model = YOLO(MODEL_PATH)
+        self.model.task = "detect"
 
     def predict_image_bytes(self, data: bytes, conf: float | None = None):
         img = Image.open(BytesIO(data)).convert("RGB")
