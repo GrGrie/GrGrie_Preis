@@ -3,11 +3,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-import time
+import time, os, tempfile, requests, fitz, re
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import List, Tuple, Optional
 
-from utils.utils import WebDriverManager
-from utils.utils import ImageDownloader
+
+from utils.utils import WebDriverManager, ImageDownloader
 
 class LidlScraper(BaseScraper):
     """Scraper implementation for Lidl website"""
@@ -298,6 +300,139 @@ class AngeboteScraper(BaseScraper):
                 continue
         
         return []
+
+class NettoScraper(BaseScraper):
+    """Scraper implementation for Netto website"""
+    
+    def __init__(self, driver_manager, image_downloader, config=None):
+        super().__init__(driver_manager, image_downloader, config)
+    
+    def handle_popups(self, driver):
+        """Handle Netto-specific popups"""
+        # As of October 2025, Netto does not have significant popups to handle
+    
+    def find_prospekt_links(self, driver) -> List[Tuple[str, str]]:
+        """Find Netto prospekt links"""        
+        links: List[Tuple[str, str]] = []
+        
+        try: 
+            # print(f"[DEBUG] Adding current URL as prospekt link for Netto: {driver.current_url}")
+            links.append(("Netto Prospekt", driver.current_url))
+        except Exception as e:
+            print(f"[ERROR] Could not add current URL as prospekt link: {e}")
+
+        return links
+    
+    def get_high_res_image_url(self, img_element) -> Optional[str]:
+        """Extract high-resolution image URL for Netto. Shouldn't be needed as Netto uses pdf for prospekt"""
+        return None
+    
+    def navigate_to_next_page(self, driver) -> bool:
+        """Navigate to next page for Netto prospekt. Netto prospekts are PDFs, so this is not applicable."""
+        return False
+    
+    def get_pdf_url(self, driver, selector: str = "#downloadAsPdf", timeout_s: int = 10):
+        """Return the PDF href from the Netto 'PDF herunterladen' button, or None."""
+        print(f"[DEBUG] Looking for PDF download link using selector: {selector}")
+        try:
+            el = WebDriverWait(driver, timeout_s).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+            )
+            href = (el.get_attribute("href") or "").strip()
+            return href or None
+        except Exception:
+            print(f"[DEBUG] No PDF download link found with selector: {selector}")
+            return None
+    
+    def get_page_images(self, driver) -> List:
+        """
+        Netto override: if a 'PDF herunterladen' link is present, download & split PDF into page_XX.jpg files.
+        """
+        pdf_url = self.get_pdf_url(driver)
+        self.config['download_path'] = os.path.join(self.config['download_path'], self.week)
+        if pdf_url:
+            print(f"✓ Found Netto PDF: {pdf_url}")
+            pages = self._download_and_split_pdf_to_jpegs(pdf_url, self.config['download_path'])
+            if pages:
+                print(f"✓ Saved {len(pages)} pages to {self.config['download_path']}/")
+                return pages
+            else:
+                raise Exception("✗ PDF download/split failed or produced no pages")
+
+    def get_week_dates(self, driver) -> Optional[str]:
+        """Extract week dates from img[alt]; fallback case is  Mon-Sat."""
+        try:
+            alts = " ".join(
+                (el.get_attribute("alt") or "").strip()
+                for el in driver.find_elements(By.CSS_SELECTOR, "img[alt]")
+            )
+        except Exception:
+            alts = ""
+
+        # dd.mm.yy
+        m = re.findall(r"\b(\d{1,2})\.(\d{1,2})\.(\d{2})\b", alts)
+        if len(m) >= 2:
+            dates = []
+            for d, mo, y in m:
+                y = int(y);  y = y + 2000
+                try:
+                    dates.append(datetime(y, int(mo), int(d)))
+                except ValueError:
+                    pass
+            if len(dates) >= 2:
+                start, end = min(dates), max(dates)
+                week = f"{start:%Y-%m-%d}_{end:%Y-%m-%d}"
+                self.week = week
+                return week
+
+        # Fallback: current Monday to Saturday
+        today = datetime.now()
+        monday = today - timedelta(days=today.weekday())
+        saturday = monday + timedelta(days=5)
+        return f"{monday:%Y-%m-%d}_{saturday:%Y-%m-%d}"
+
+    
+    @staticmethod
+    def _download_and_split_pdf_to_jpegs(pdf_url: str, out_dir: str | Path) -> list[str]:
+        """
+        Download a PDF and render each page to JPEG:
+        page_01.jpg, page_02.jpg, ...
+        Always deletes the temporary PDF at the end.
+        """
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1) download to temp file
+        headers = {"User-Agent": "Mozilla/5.0"}
+        tmp_pdf_path = None
+        saved: list[str] = []
+        try:
+            with requests.get(pdf_url, headers=headers, stream=True, timeout=30) as r:
+                r.raise_for_status()
+                fd, tmp_pdf_path = tempfile.mkstemp(suffix=".pdf")
+                with os.fdopen(fd, "wb") as f:
+                    for chunk in r.iter_content(65536):
+                        if chunk:
+                            f.write(chunk)
+
+            # 2) render to JPEGs (≈200 DPI)
+            doc = fitz.open(tmp_pdf_path)
+            zoom = 200 / 72.0
+            mat = fitz.Matrix(zoom, zoom)
+            for i, page in enumerate(doc, start=1):
+                pix = page.get_pixmap(matrix=mat, alpha=False)
+                out_path = out_dir / f"page_{i:02d}.jpg"
+                pix.save(out_path.as_posix(), jpg_quality=92)
+                saved.append(out_path.name)  # return basenames to match existing behavior
+            doc.close()
+            return saved
+        finally:
+            if tmp_pdf_path and os.path.exists(tmp_pdf_path):
+                try:
+                    os.remove(tmp_pdf_path)
+                except Exception:
+                    pass
+
 class ScraperFactory:
     """Factory class to create appropriate scraper instances"""
     
@@ -308,5 +443,7 @@ class ScraperFactory:
             return LidlScraper(driver_manager, image_downloader, config)
         elif 'angebote.com' in url:
             return AngeboteScraper(driver_manager, image_downloader, config)
+        elif 'netto-online.de' in url:
+            return NettoScraper(driver_manager, image_downloader, config)
         else:
             raise ValueError(f"No scraper available for URL: {url}")

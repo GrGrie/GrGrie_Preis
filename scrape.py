@@ -1,10 +1,8 @@
-import os
-import argparse
-import json
+import os, argparse, json
 from typing import Dict
-
 from utils.utils import ImageDownloader
 from utils.utils import WebDriverManager
+from utils.utils import DirectoryManager
 from utils.scrapers import ScraperFactory 
 
 # Configuration management
@@ -50,6 +48,8 @@ class ScraperConfig:
                 url = "https://www.lidl.de/c/online-prospekte/s10005610"
             elif site == 'angebote':
                 url = "https://angebote.com/lidl/archives?page=1"
+            elif site == 'netto':
+                url = "https://wochenprospekt.netto-online.de/hz" + DirectoryManager.get_current_week_number() + "_wrse/?storeid=8135"
         else:
             # No arguments provided - show help
             parser.print_help()
@@ -65,7 +65,7 @@ def main():
         
     parser = argparse.ArgumentParser(description='Web scraper for prospekt/flyer websites')
     parser.add_argument('--url', '-u', type=str, help='URL to scrape')
-    parser.add_argument('--site', '-s', type=str, choices=['lidl', 'angebote'], 
+    parser.add_argument('--site', '-s', type=str, choices=['lidl', 'angebote', 'netto'], 
                        help='Predefined site to scrape')
     parser.add_argument('--no-headless', action='store_false',
                        help='Run browser in no-headless mode (default is headless)')
@@ -83,8 +83,15 @@ def main():
     # Override config with command line arguments
     config.config['headless'] = args.no_headless if not args.no_headless else True
 
-    if args.download_path:
+    if args.download_path and args.site:
+        config.config['download_path'] = os.path.join(args.download_path, args.site)
+    elif args.download_path:
         config.config['download_path'] = args.download_path
+    elif args.site:
+        config.config['download_path'] = os.path.join(config.config['download_path'], args.site)
+
+    if args.site.lower() == 'netto':
+        config.config['window_size'] = "1920,1080"
     
     # Setup components
     driver_manager = WebDriverManager(
@@ -101,6 +108,7 @@ def main():
     
     try:
         scraper = ScraperFactory.create_scraper(url, driver_manager, image_downloader, config.config)
+        print("[DEBUG] Scraper instance created successfully")
         results = scraper.scrape(url, config.config['download_path'], args.num_prospekt)
 
         if results['success']:
