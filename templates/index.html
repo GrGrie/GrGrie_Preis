@@ -1,12 +1,50 @@
-<!doctype html><html><body>
-<h2>Run scraping and interference</h2>
-<form method="post" action="/run">
-  <label>site:</label><input name="site" value="lidl"/>
-  <label>conf:</label><input name="conf" value="0.25"/>
-  <button type="submit">Go</button>
-</form>
-<h3>Last runs:</h3>
-<ul>
-  {% for r in runs %}<li><a href="/runs/{{r}}">{{r}}</a></li>{% endfor %}
-</ul>
-</body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Prospekt Scraper & Detector</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 900px; margin: 2rem auto; }
+    form { display: grid; gap: .6rem; grid-template-columns: 220px 1fr; align-items: center; }
+    label { font-weight: 600; }
+    input, select, button { padding: .5rem .6rem; }
+    .runs a { display:block; padding:.25rem 0; }
+    .muted { color:#666; }
+  </style>
+</head>
+<body>
+  <h1>Lidl Prospekt → Product Crops</h1>
+
+  <form action="/run-sync" method="post">
+    <label for="site">Website</label>
+    <select id="site" name="site" required>
+      <option value="lidl">lidl</option>
+      <option value="angebote">angebote</option>
+    </select>
+
+    <label for="num_prospekt">Number of Prospekt</label>
+    <input id="num_prospekt" name="num_prospekt" type="number" min="1" step="1" value="1" required>
+
+    <label for="conf">Confidence</label>
+    <input id="conf" name="conf" type="number" min="0" max="1" step="0.01" value="0.25" required>
+
+    <div></div>
+    <button type="submit">Scrape & Detect</button>
+  </form>
+  
+  <form action="/run-ocr-latest" method="post" style="margin-top:1rem;">
+    <button type="submit">🔎 Run OCR on Latest Run</button>
+  </form>
+
+  <h2 style="margin-top:2rem">Recent runs</h2>
+  <div class="runs">
+    {% for r in runs %}
+      <div>
+        <a href="/runs/{{ r }}/meta">Open results: {{ r }}</a>
+      </div>
+    {% else %}
+      <small class="muted">No runs yet.</small>
+    {% endfor %}
+  </div>
+</body>
+</html>

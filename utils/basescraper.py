@@ -49,7 +49,7 @@ class BaseScraper(ABC):
     
     def get_week_dates(self, driver) -> Optional[str]:
         """Extract week dates from the page, return in YYYY-MM-DD_YYYY-MM-DD format"""
-        return None  # Default implementation returns None
+        return None
 
     def select_prospekt(self, prospekt_links: List[Tuple[str, str]], index: int) -> str:
         """Return the URL of the prospekt specified by a 1-based index"""
@@ -68,7 +68,8 @@ class BaseScraper(ABC):
         return self.driver
     
     def download_page_images(self, driver, download_dir: str) -> List[str]:
-        """Navigate through pages and download images"""
+        """Navigate through pages and download images or handle PDF if applicable"""
+        
         page = 1
         max_pages = self.max_pages
         downloaded_images = []
@@ -87,7 +88,7 @@ class BaseScraper(ABC):
                 page_urls = set()
                 
                 img_elements = self.get_page_images(driver)
-                
+     
                 for i, img in enumerate(img_elements):
                     # Skip very small images
                     try:
@@ -123,7 +124,7 @@ class BaseScraper(ABC):
             
             # Try to navigate to next page
             if not self.navigate_to_next_page(driver):
-                print("No more pages found")
+                print("  No more pages found")
                 break
                 
             page += 1
@@ -141,12 +142,15 @@ class BaseScraper(ABC):
         }
         
         try:
+            print(f"[DEBUG] Starting scrape for {url}. Setting up driver...")
             driver = self.setup_driver()
-            # print(f"[DEBUG] Opening {url}...")
+            print(f"[DEBUG] Opening {url} ...")
             driver.get(url)
+            print(f"[DEBUG] Page loaded. Handling popups...")
             
             # Handle popups
             self.handle_popups(driver)
+            print(f"[DEBUG] Popups handled. Finding prospekt links...")
             
             # Find prospekt links
             prospekt_links = self.find_prospekt_links(driver)
@@ -159,6 +163,7 @@ class BaseScraper(ABC):
                 print(f"  {idx}. {name} - {link}")
 
             # Choose prospekt
+            print(f"[DEBUG] Selecting prospekt #{prospekt_index} ...")
             prospekt_url = self.select_prospekt(prospekt_links, prospekt_index)
 
             # Open prospekt
@@ -166,18 +171,20 @@ class BaseScraper(ABC):
                 driver.get(prospekt_url)
                 time.sleep(5)
             
-            # Extract week dates from the actual prospekt    
+            # Extract week dates from the actual prospekt  
+            print(f"[DEBUG] Extracting week dates...")  
             week_dates = self.get_week_dates(driver)
             
             # Create download directory
             if week_dates:
+                print(f"[DEBUG] Creating download directory for week: {week_dates}")
                 download_dir = DirectoryManager.create_download_directory(download_path, week_dates)
             else:
+                print("[DEBUG] Could not determine week dates, using current week folder")
                 download_dir = DirectoryManager.create_download_directory(download_path)
-            
-            print(f"Created directory: {download_dir}")
-            
+                        
             # Download images
+            print(f"[DEBUG] Starting image download to {download_dir} ...")
             downloaded_images = self.download_page_images(driver, download_dir)
             print(f"✓ Downloaded {len(downloaded_images)} images to {download_dir}/")
             

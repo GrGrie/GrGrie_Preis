@@ -1,9 +1,12 @@
 import os
+
+import requests
 from datetime import datetime, timedelta
 from typing import Optional, Dict
-import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 from ultralytics import YOLO
 
 
@@ -33,7 +36,6 @@ class ImageDownloader:
             print(f"Error downloading {url}: {e}")
             return False
 
-
 class DirectoryManager:
     """Manages directory creation and file paths"""
 
@@ -52,10 +54,20 @@ class DirectoryManager:
             subfolder = DirectoryManager.get_week_folder()
 
         download_dir = os.path.join(base_path, subfolder)
-        os.makedirs(download_dir, exist_ok=True)
+        
+        # Check if the directory already exists
+        if not os.path.exists(download_dir):
+            os.makedirs(download_dir, exist_ok=True)
+        else:
+            print(f"[DEBUG] Directory already exists: {download_dir}")
+            
         return download_dir
 
-
+    @staticmethod
+    def get_current_week_number() -> str:
+        """Get current week number"""
+        now = datetime.now()
+        return str(now.isocalendar()[1])
 class WebDriverManager:
     """Manages WebDriver setup and configuration"""
 
@@ -64,14 +76,23 @@ class WebDriverManager:
         self.window_size = window_size
 
     def setup_driver(self):
-        """Setup Chrome driver with options"""
         options = Options()
         if self.headless:
-            options.add_argument("--headless")
+            # modern headless flag
+            options.add_argument("--headless=new")
+        # Suppress GCM/GCM registration errors
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        
+        # Additional useful options for scraping
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_argument('--log-level=3')  # Only show fatal errors
+        
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument(f"--window-size={self.window_size}")
-        return webdriver.Chrome(options=options)
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=options)
+
 
 
 class ONNXExporter:

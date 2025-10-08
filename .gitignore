@@ -2,6 +2,7 @@
 data/
 eval-results/
 runs/
+static/
 
 # Ignore Python bytecode
 __pycache__/

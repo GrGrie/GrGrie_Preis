@@ -237,41 +237,47 @@ def prepare_global_dataset(train_ratio, val_ratio, test_ratio):
     # Collect all image-label pairs from all week folders
     all_image_label_pairs = []
     
-    # Find all week folders (excluding _labels folders)
-    week_folders = [
-        name for name in os.listdir(originals_dir) 
-        if originals_dir.joinpath(name).is_dir() and not name.endswith("_labels")
-    ]
-    
-    print(f"Found {len(week_folders)} week folders: {week_folders}")
-    
-    for week in week_folders:
-        week_path = originals_dir / week
-        labels_path = originals_dir / f"{week}_labels"
+    # Find all subdirectories (lidl, netto, etc.)
+    subdirectories = [d for d in originals_dir.iterdir() if d.is_dir()]
+
+    print(f"Found {len(subdirectories)} subdirectories: {subdirectories}")
+
+    for subdir in subdirectories:
+        # Find all week folders (without _labels suffix)
+        week_folders = [
+            name for name in os.listdir(subdir) 
+            if subdir.joinpath(name).is_dir() and not name.endswith("_labels")
+        ]
         
-        if not week_path.exists():
-            print(f"Warning: Week folder '{week_path}' does not exist. Skipping.")
-            continue
+        print(f"Found {len(week_folders)} week folders in '{subdir.name}': {week_folders}")
+        
+        for week in week_folders:
+            week_path = subdir / week
+            labels_path = subdir / f"{week}_labels"
             
-        if not labels_path.exists():
-            print(f"Warning: Labels folder '{labels_path}' does not exist. Skipping {week}.")
-            continue
-        
-        # Get all PNG images in the week folder
-        images = list(week_path.glob("*.png"))
-        print(f"Week {week}: Found {len(images)} images")
-        
-        # Check for corresponding labels
-        valid_pairs = 0
-        for img_path in images:
-            label_path = labels_path / f"{img_path.stem}.txt"
-            if label_path.exists():
-                # Check if the label file contains class 5 (Product)
-                if has_product_class(label_path):
-                    all_image_label_pairs.append((img_path, label_path))
-                    valid_pairs += 1
-        
-        print(f"Week {week}: {valid_pairs} valid image-label pairs with Product class")
+            if not week_path.exists():
+                print(f"Warning: Week folder '{week_path}' does not exist. Skipping.")
+                continue
+                
+            if not labels_path.exists():
+                print(f"Warning: Labels folder '{labels_path}' does not exist. Skipping {week}.")
+                continue
+            
+            # Get all PNG images in the week folder
+            images = list(week_path.glob("*.png"))
+            print(f"Week {week}: Found {len(images)} images")
+            
+            # Check for corresponding labels
+            valid_pairs = 0
+            for img_path in images:
+                label_path = labels_path / f"{img_path.stem}.txt"
+                if label_path.exists():
+                    # Check if the label file contains class 5 (Product)
+                    if has_product_class(label_path):
+                        all_image_label_pairs.append((img_path, label_path))
+                        valid_pairs += 1
+            
+            print(f"Week {week}: {valid_pairs} valid image-label pairs with Product class")
     
     if not all_image_label_pairs:
         raise ValueError("No valid image-label pairs found with Product class (class 5)")
