@@ -50,6 +50,8 @@ class ScraperConfig:
                 url = "https://angebote.com/lidl/archives?page=1"
             elif site == 'netto':
                 url = "https://wochenprospekt.netto-online.de/hz" + DirectoryManager.get_current_week_number() + "_wrse/?storeid=8135"
+            elif site == 'aldi':
+                url = "https://www.aldi-sued.de/de/angebote/prospekte.html"
         else:
             # No arguments provided - show help
             parser.print_help()
@@ -65,7 +67,7 @@ def main():
         
     parser = argparse.ArgumentParser(description='Web scraper for prospekt/flyer websites')
     parser.add_argument('--url', '-u', type=str, help='URL to scrape')
-    parser.add_argument('--site', '-s', type=str, choices=['lidl', 'angebote', 'netto'], 
+    parser.add_argument('--site', '-s', type=str, choices=['lidl', 'angebote', 'netto', 'aldi'], 
                        help='Predefined site to scrape')
     parser.add_argument('--no-headless', action='store_false',
                        help='Run browser in no-headless mode (default is headless)')
@@ -90,7 +92,7 @@ def main():
     elif args.site:
         config.config['download_path'] = os.path.join(config.config['download_path'], args.site)
 
-    if args.site.lower() == 'netto':
+    if args.site.lower() in ['netto', 'aldi']:
         config.config['window_size'] = "1920,1080"
     
     # Setup components
