@@ -1,9 +1,9 @@
-from utils.utils import DirectoryManager
-from utils.utils import WebDriverManager
-from utils.utils import ImageDownloader
-
+import tempfile
+import fitz
+import requests
+from utils.utils import DirectoryManager, WebDriverManager, ImageDownloader
 from abc import ABC, abstractmethod
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Dict
 import time
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
@@ -21,54 +21,31 @@ class BaseScraper(ABC):
         self.config = config or {}
         self.max_pages = self.config.get('max_pages', 100)
         self.timeout = self.config.get('timeout', 5)
+        self.contains_pdf = self.config.get('download_pdf_if_available', True)
+        self.contains_popups = False
 
     @abstractmethod
-    def handle_popups(self, driver) -> None:
-        """Handle website-specific popups"""
+    def handle_popups(self, driver):
+        """Handle any popups specific to the site"""
         pass
     
     @abstractmethod
-    def find_prospekt_links(self, driver) -> List[Tuple[str, str]]:
-        """Find and return (name, url) tuples for available prospekts"""
+    def find_scrapable_url(self, driver) -> List[Tuple[str, str]]:
+        """Find and return list of (name, url) tuples for available prospekts. If found PDF URL, return [("PDF", pdf_url)]"""
         pass
     
     @abstractmethod
-    def get_high_res_image_url(self, img_element) -> Optional[str]:
-        """Extract high-resolution image URL from img element"""
+    def get_week_dates(self, driver) -> str:
+        """Extract and return the week date range string from the page"""
         pass
-    
-    @abstractmethod
-    def navigate_to_next_page(self, driver) -> bool:
-        """Navigate to next page, return True if successful"""
-        pass
-    
-    @abstractmethod
-    def get_page_images(self, driver) -> List:
-        """Get all image elements from current page"""
-        pass
-    
-    def get_week_dates(self, driver) -> Optional[str]:
-        """Extract week dates from the page, return in YYYY-MM-DD_YYYY-MM-DD format"""
-        return None
-
-    def select_prospekt(self, prospekt_links: List[Tuple[str, str]], index: int) -> str:
-        """Return the URL of the prospekt specified by a 1-based index"""
-        if not prospekt_links:
-            raise ValueError("No prospekt links available")
-        if index < 1 or index > len(prospekt_links):
-            print(f"⚠ Invalid prospekt index {index}, defaulting to 1")
-            index = 1
-        name, url = prospekt_links[index - 1]
-        # print(f"[DEBUG] Using prospekt #{index}: {name}")
-        return url
     
     def setup_driver(self):
         """Setup and return driver"""
         self.driver = self.driver_manager.setup_driver()
         return self.driver
     
-    def download_page_images(self, driver, download_dir: str) -> List[str]:
-        """Navigate through pages and download images or handle PDF if applicable"""
+    def download_images_from_url(self, driver, download_dir: str) -> List[str]:
+        """Navigate through pages and download images"""
         
         page = 1
         max_pages = self.max_pages
@@ -130,8 +107,43 @@ class BaseScraper(ABC):
             page += 1
         
         return downloaded_images
+
+    def download_available_pdf(self, pdf_url: str, save_dir: str) -> List[str]:
+        """
+        Download a PDF and render each page to JPEG:
+        page_01.jpg, page_02.jpg, ...
+        Always deletes the temporary PDF at the end.
+        """
+        headers = {"User-Agent": "Mozilla/5.0"}
+        tmp_pdf_path = None
+        saved: list[str] = []
+        try:
+            # Download PDF to temp file
+            with requests.get(pdf_url, headers=headers, stream=True, timeout=30) as r:
+                r.raise_for_status()
+                fd, tmp_pdf_path = tempfile.mkstemp(suffix=".pdf")
+                with os.fdopen(fd, "wb") as f:
+                    for chunk in r.iter_content(65536):
+                        if chunk:
+                            f.write(chunk)
+
+            # Open PDF and save each page as JPEG
+            doc = fitz.open(tmp_pdf_path)
+            for i, page in enumerate(doc, start=1):
+                pix = page.get_pixmap()
+                out_path = os.path.join(save_dir, f"page_{i:02d}.jpg")
+                pix.save(out_path)
+                saved.append(f"page_{i:02d}.jpg")
+            doc.close()
+            return saved
+        finally:
+            if tmp_pdf_path and os.path.exists(tmp_pdf_path):
+                try:
+                    os.remove(tmp_pdf_path)
+                except Exception:
+                    pass
     
-    def scrape(self, url: str, download_path: str = "data/originals", prospekt_index: int = 1) -> Dict:
+    def scrape(self, url: str, download_path: str = "data/originals") -> Dict:
         """Main scraping method"""
         
         results = {
@@ -144,49 +156,46 @@ class BaseScraper(ABC):
         try:
             print(f"[DEBUG] Starting scrape for {url}. Setting up driver...")
             driver = self.setup_driver()
+            
             print(f"[DEBUG] Opening {url} ...")
             driver.get(url)
-            print(f"[DEBUG] Page loaded. Handling popups...")
             
-            # Handle popups
-            self.handle_popups(driver)
-            print(f"[DEBUG] Popups handled. Finding prospekt links...")
+            if self.contains_popups:
+                print(f"[DEBUG] Page loaded. Handling popups...")
+                self.handle_popups(driver)
+                print(f"[DEBUG] Popups successfully handled")
             
-            # Find prospekt links
-            prospekt_links = self.find_prospekt_links(driver)
-            if not prospekt_links:
-                results['error'] = "Could not find any prospekt links"
+            # Find scrapable URLs
+            print(f"[DEBUG] Finding scrapable URLs...")
+            scrapable_urls = self.find_scrapable_url(driver)
+            if not scrapable_urls:
+                results['error'] = "Could not find any scrapable URLs"
                 return results
 
-            print("Available prospekts:")
-            for idx, (name, link) in enumerate(prospekt_links, 1):
-                print(f"  {idx}. {name} - {link}")
+            print(f"[DEBUG] Selecting url {scrapable_urls[0][1]} ...")
+            final_url = scrapable_urls[0][1] if scrapable_urls else None
 
-            # Choose prospekt
-            print(f"[DEBUG] Selecting prospekt #{prospekt_index} ...")
-            prospekt_url = self.select_prospekt(prospekt_links, prospekt_index)
-
-            # Open prospekt
-            if prospekt_url != url:  # Only navigate if it's a different URL
-                driver.get(prospekt_url)
+            # Open prospekt if it's a different URL and we are not dealing with a PDF
+            if final_url != url and not self.contains_pdf:
+                driver.get(final_url)
                 time.sleep(5)
             
             # Extract week dates from the actual prospekt  
             print(f"[DEBUG] Extracting week dates...")  
-            week_dates = self.get_week_dates(driver)
+            week_dates = self.get_week_dates(driver, final_url)
             
             # Create download directory
-            if week_dates:
-                print(f"[DEBUG] Creating download directory for week: {week_dates}")
-                download_dir = DirectoryManager.create_download_directory(download_path, week_dates)
-            else:
-                print("[DEBUG] Could not determine week dates, using current week folder")
-                download_dir = DirectoryManager.create_download_directory(download_path)
-                        
-            # Download images
+            print(f"[DEBUG] Creating download directory for week: {week_dates}")
+            download_dir = DirectoryManager.create_download_directory(download_path, week_dates)
+        
+            # Download images or PDF
             print(f"[DEBUG] Starting image download to {download_dir} ...")
-            downloaded_images = self.download_page_images(driver, download_dir)
-            print(f"✓ Downloaded {len(downloaded_images)} images to {download_dir}/")
+            if not self.contains_pdf:
+                print(f"[DEBUG] Downloading images from HTML content...")
+                downloaded_images = self.download_images_from_url(driver, download_dir)
+            else:
+                print(f"[DEBUG] Downloading available PDF...")
+                downloaded_images = self.download_available_pdf(final_url, download_dir)
             
             results.update({
                 'success': True,
@@ -197,7 +206,7 @@ class BaseScraper(ABC):
             
         except Exception as e:
             results['error'] = str(e)
-            print(f"Error: {e}")
+            print(f"Error in base scraper: {e}")
         finally:
             driver.quit()
         

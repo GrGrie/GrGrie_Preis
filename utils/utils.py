@@ -82,9 +82,15 @@ class WebDriverManager:
             options.add_argument("--headless=new")
         # Suppress GCM/GCM registration errors
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+          "AppleWebKit/537.36 (KHTML, like Gecko) "
+          "Chrome/140.0.0.0 Safari/537.36")
+        options.add_argument(f"--user-agent={ua}")
         
         # Additional useful options for scraping
         options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
         options.add_argument('--log-level=3')  # Only show fatal errors
         
         options.add_argument("--no-sandbox")
@@ -92,8 +98,6 @@ class WebDriverManager:
         options.add_argument(f"--window-size={self.window_size}")
         service = Service(ChromeDriverManager().install())
         return webdriver.Chrome(service=service, options=options)
-
-
 
 class ONNXExporter:
     """Handles ONNX export functionality"""
