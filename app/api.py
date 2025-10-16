@@ -1,11 +1,11 @@
-# To run: `uvicorn app.api:app --host 0.0.0.0 --port 80000 --reload`
-from app.pipeline import run_once
+# To run: `uvicorn app.api:app --host 0.0.0.0 --port 8000 --reload`
+from app.pipeline import crop_only, run_once, scrape_only, ocr_latest_run
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-from app.ocr import ocr_folder
+# from app.ocr import ocr_folder
 import json
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # project root
@@ -41,9 +41,37 @@ def _latest_run_dir() -> Path | None:
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "runs": _recent_runs()})
 
-@app.post("/run-sync")
-def run_sync(site: str = Form("lidl"), num_prospekt: int = Form(1), conf: float = Form(0.25)):
-    meta = run_once(site, conf, num_prospekt)
+@app.post("/scrape-crop-ocr")
+def run_sync(site: str = Form("lidl"), conf: float = Form(0.25)):
+    print(f"[INFO] [api] Starting full run for site '{site}' with conf={conf}...")
+    meta = run_once(site, conf)
+    return RedirectResponse(url=f"/done/{meta['run_id']}", status_code=303)
+
+@app.post("/scrape")
+def scrape_only_endpoint(site: str = Form(...)):
+    """
+    Scrape pages for the given site and prospekt count, without running inference.
+    Returns a 303 redirect to /done/{run_id} for a consistent UX.
+    """
+    meta = scrape_only(site=site)
+    return RedirectResponse(url=f"/done/{meta['run_id']}", status_code=303)
+
+@app.post("/crop")
+def crop_latest(site: str = Form("lidl"), conf: float = Form(0.25)):
+    """
+    Run cropping only on the latest run, without scraping new pages.
+    Returns a 303 redirect to /done/{run_id} for a consistent UX.
+    """
+    meta = crop_only(site=site, conf=conf)
+    return RedirectResponse(url=f"/done/{meta['run_id']}", status_code=303)
+
+@app.post("/ocr-latest")
+def ocr_latest_run_endpoint():
+    """
+    Run OCR only on the latest run, without scraping or cropping.
+    Returns a 303 redirect to /done/{run_id} for a consistent UX.
+    """
+    meta = ocr_latest_run()
     return RedirectResponse(url=f"/done/{meta['run_id']}", status_code=303)
 
 # lightweight done page that auto-redirects back to "/"
@@ -69,14 +97,14 @@ def rerun_ocr(run_id: str):
         return JSONResponse({"error": "crops not found for this run"}, status_code=404)
     out_json = run_dir / "ocr.json"
     out_csv  = run_dir / "ocr.csv"
-    info = ocr_folder(crops, out_json, out_csv)
+    # info = ocr_folder(crops, out_json, out_csv)
     # patch meta.json if present
     meta_path = run_dir / "meta.json"
     if meta_path.exists():
         meta = json.loads(meta_path.read_text("utf-8"))
-        meta["ocr"] = info
+        # meta["ocr"] = info
         meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
-    return JSONResponse(info)
+    return JSONResponse({"status": "OCR re-run completed", "run_id": run_id})
 
 @app.post("/run-ocr-latest")
 def run_ocr_latest():

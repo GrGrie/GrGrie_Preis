@@ -7,9 +7,9 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONUNBUFFERED=1
 
 # 2.2 System libs for onnxruntime / pillow / opencv-headless
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#      ca-certificates libgomp1 libglib2.0-0 \
-#    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+     ca-certificates libgomp1 libglib2.0-0 \
+   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -18,15 +18,14 @@ RUN pip install --no-cache-dir \
       onnxruntime \
       fastapi uvicorn \
       numpy pillow \
-      opencv-python-headless
+      opencv-python-headless  
+      # ultralytics 
 
 # 2.4 Copying code
 COPY app/ app/
-COPY yolo_predict.py yolo_predict.py
 COPY utils/ utils/
+COPY templates/ templates/
 COPY scrape.py scrape.py  
-
-# 2.5 Copy only ONNX model
 COPY models/best.onnx /models/best.onnx
 
 # 2.6 Environment variables

@@ -130,7 +130,7 @@ class BaseScraper(ABC):
             # Open PDF and save each page as JPEG
             doc = fitz.open(tmp_pdf_path)
             for i, page in enumerate(doc, start=1):
-                pix = page.get_pixmap()
+                pix = page.get_pixmap(dpi=200)
                 out_path = os.path.join(save_dir, f"page_{i:02d}.jpg")
                 pix.save(out_path)
                 saved.append(f"page_{i:02d}.jpg")
