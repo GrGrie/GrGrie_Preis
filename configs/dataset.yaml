@@ -1,6 +1,6 @@
-path: ./data
-train: train
-val: train
+train: lists/train.txt
+val:   lists/val.txt
+test:  lists/test.txt
 
 # Classes
 names:
