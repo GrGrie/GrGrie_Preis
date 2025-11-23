@@ -9,6 +9,8 @@ from ultralytics import YOLO
 import numpy as np
 import onnxruntime as ort
 
+from app.ocr import PaddleOcrService
+
 
 #  Directory to save inference results (images with boxes, labels, etc.)
 RUNS_DIR = Path(os.getenv("RUNS_DIR", "static/runs")).resolve()
@@ -128,6 +130,7 @@ def run_once(site: str = "lidl", conf: float = 0.25) -> dict:
     yolo = YoloService(conf=conf)
     items = []
     pages_dir = _last_modified_directory(DATA_ORIGINALS)
+    from app.ocr import OcrService
     for i, page_path in enumerate(sorted(pages_dir.glob("*.jpg")), 1):
         img = Image.open(page_path).convert("RGB")
         dets = yolo.predict_pil(img, conf=conf)
@@ -138,13 +141,14 @@ def run_once(site: str = "lidl", conf: float = 0.25) -> dict:
             outp = crops_dir / name
             crop.save(outp, "JPEG", quality=90)
             print(f"[INFO] [pipeline] Saved crop: {outp}, running OCR...")
-            ocr_space_file(outp)
+            ocr_result = PaddleOcrService.infer(crop)
             items.append({
                 "page": i,
                 "file": f"/static/runs/{run_dir.name}/crops/{name}",
                 "class_id": d["class_id"],
                 "score": d["score"],
-                "box": d["box"]
+                "box": d["box"],
+                "ocr": ocr_result
             })
 
      # NEW: OCR over crops
@@ -228,31 +232,6 @@ def crop_only(site: str = "lidl", conf: float = 0.25) -> dict:
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
     return meta
 
-def ocr_space_file(filename, overlay=False, api_key=OCR_API_KEY, language='ger'):
-    """ OCR.space API request with local file.
-        Python3.5 - not tested on 2.7
-    :param filename: Your file path & name.
-    :param overlay: Is OCR.space overlay required in your response.
-                    Defaults to False.
-    :param api_key: OCR.space API key.
-                    Defaults to 'helloworld'.
-    :param language: Language code to be used in OCR.
-                    List of available language codes can be found on https://ocr.space/OCRAPI
-                    Defaults to 'en'.
-    :return: Result in JSON format.
-    """
-
-    payload = {'isOverlayRequired': overlay,
-               'apikey': api_key,
-               'language': language,
-               }
-    with open(filename, 'rb') as f:
-        r = req.post('https://api.ocr.space/parse/image',
-                          files={filename: f},
-                          data=payload,
-                          )
-    return r.content.decode()
-
 def ocr_latest_run() -> dict:
     """
     Run OCR only on the latest run, without scraping or cropping.
@@ -278,7 +257,7 @@ def ocr_latest_run() -> dict:
         print(f"[INFO] [pipeline] Processing OCR for: {crop_file.name}")
         try:
             #print(f"[INFO] [pipeline] Sending {crop_file.name} to OCR.space API. It's type is {type(crop_file.name)}")
-            ocr_result = ocr_space_file(str(crops_dir / crop_file.name))
+            ocr_result = PaddleOcrService.infer(crop_file)
             # Parse the JSON response and append to results
             ocr_data = json.loads(ocr_result)
             ocr_results.append({

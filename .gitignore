@@ -11,3 +11,6 @@ __pycache__/
 # Ignore yolo models
 yolo11n.pt
 yolo11m.pt
+
+# Ignore codex-agents
+Agents.md
