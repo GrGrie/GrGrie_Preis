@@ -2,13 +2,12 @@
 # docker build -t grgrie-inference .
 # docker run -p 8000:8000 -v $(pwd)/data:/app/data grgrie-inference
 
-from app.pipeline import crop_only, run_once, scrape_only, ocr_latest_run
+from app.pipeline import crop_only, scrape_only, ocr_latest_run, scrape_crop_ocr
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-# from app.ocr import ocr_folder
 import json
 
 BASE_DIR = Path(__file__).resolve().parent.parent  # project root
@@ -44,17 +43,20 @@ def _latest_run_dir() -> Path | None:
 def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "runs": _recent_runs()})
 
+# Button "Scrape + Crop + OCR"
 @app.post("/scrape-crop-ocr")
-def run_sync(site: str = Form("lidl"), conf: float = Form(0.25)):
+def run_sync(site: str = Form("lidl"), conf: float = Form(0.75)):
+    """
+    Run the full pipeline (scrape + crop + ocr) for the given site and confidence threshold.
+    """
     print(f"[INFO] [api] Starting full run for site '{site}' with conf={conf}...")
-    meta = run_once(site, conf)
+    meta = scrape_crop_ocr(site, conf)
     return RedirectResponse(url=f"/done/{meta['run_id']}", status_code=303)
 
 @app.post("/scrape")
 def scrape_only_endpoint(site: str = Form(...)):
     """
     Scrape pages for the given site and prospekt count, without running inference.
-    Returns a 303 redirect to /done/{run_id} for a consistent UX.
     """
     meta = scrape_only(site=site)
     return RedirectResponse(url=f"/done/{meta['run_id']}", status_code=303)
@@ -63,7 +65,6 @@ def scrape_only_endpoint(site: str = Form(...)):
 def crop_latest(site: str = Form("lidl"), conf: float = Form(0.25)):
     """
     Run cropping only on the latest run, without scraping new pages.
-    Returns a 303 redirect to /done/{run_id} for a consistent UX.
     """
     meta = crop_only(site=site, conf=conf)
     return RedirectResponse(url=f"/done/{meta['run_id']}", status_code=303)
@@ -72,7 +73,6 @@ def crop_latest(site: str = Form("lidl"), conf: float = Form(0.25)):
 def ocr_latest_run_endpoint():
     """
     Run OCR only on the latest run, without scraping or cropping.
-    Returns a 303 redirect to /done/{run_id} for a consistent UX.
     """
     meta = ocr_latest_run()
     return RedirectResponse(url=f"/done/{meta['run_id']}", status_code=303)
@@ -83,56 +83,3 @@ def done(request: Request, run_id: str):
     meta_path = BASE_DIR / "static" / "runs" / run_id / "meta.json"
     meta = json.loads(meta_path.read_text("utf-8")) if meta_path.exists() else {"run_id": run_id}
     return templates.TemplateResponse("done.html", {"request": request, "meta": meta})
-
-# raw meta.json for quick inspection
-@app.get("/runs/{run_id}/meta")
-def run_meta(run_id: str):
-    meta_path = BASE_DIR / "static" / "runs" / run_id / "meta.json"
-    if not meta_path.exists():
-        return JSONResponse({"error": "meta.json not found"}, status_code=404)
-    return JSONResponse(json.loads(meta_path.read_text("utf-8")))
-
-@app.post("/runs/{run_id}/ocr")
-def rerun_ocr(run_id: str):
-    run_dir = BASE_DIR / "static" / "runs" / run_id
-    crops   = run_dir / "crops"
-    if not crops.exists():
-        return JSONResponse({"error": "crops not found for this run"}, status_code=404)
-    out_json = run_dir / "ocr.json"
-    out_csv  = run_dir / "ocr.csv"
-    # info = ocr_folder(crops, out_json, out_csv)
-    # patch meta.json if present
-    meta_path = run_dir / "meta.json"
-    if meta_path.exists():
-        meta = json.loads(meta_path.read_text("utf-8"))
-        # meta["ocr"] = info
-        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
-    return JSONResponse({"status": "OCR re-run completed", "run_id": run_id})
-
-@app.post("/run-ocr-latest")
-def run_ocr_latest():
-    run_dir = _latest_run_dir()
-    if run_dir is None:
-        return JSONResponse({"error": "No runs found"}, status_code=404)
-
-    crops = run_dir / "crops"
-    if not crops.exists():
-        return JSONResponse({"error": f"No crops found in {run_dir.name}"}, status_code=404)
-
-    out_json = run_dir / "ocr.json"
-    out_csv  = run_dir / "ocr.csv"
-    print(f"[DEBUG] Running OCR on latest run: {run_dir.name}")
-    info = ocr_folder(crops, out_json, out_csv)
-
-    # Patch meta.json if present
-    meta_path = run_dir / "meta.json"
-    if meta_path.exists():
-        try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-        except Exception:
-            meta = {}
-        meta["ocr"] = info
-        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    # Redirect to the existing "done" page for this run (so the user sees results)
-    return RedirectResponse(url=f"/done/{run_dir.name}", status_code=303)

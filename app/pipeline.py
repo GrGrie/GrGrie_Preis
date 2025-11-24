@@ -9,9 +9,6 @@ from ultralytics import YOLO
 import numpy as np
 import onnxruntime as ort
 
-from app.ocr import PaddleOcrService
-
-
 #  Directory to save inference results (images with boxes, labels, etc.)
 RUNS_DIR = Path(os.getenv("RUNS_DIR", "static/runs")).resolve()
 DATA_ORIGINALS = Path(os.getenv("DATA_ORIGINALS", "static")).resolve()
@@ -118,19 +115,22 @@ def _try_call_scraper(site: str, output_dir: Path) -> bool:
         print(f"[ERROR] [pipeline] Failed to run scraper: {e}")
         return False
 
-def run_once(site: str = "lidl", conf: float = 0.25) -> dict:
+def scrape_crop_ocr(site: str = "lidl", conf: float = 0.75) -> dict:
     run_dir   = _new_run_dir()
-    pages_dir = DATA_ORIGINALS / site
     crops_dir = run_dir / "crops"
 
     # 1) Scrape PNG pages for the given site and prospekt
     _try_call_scraper(site, DATA_ORIGINALS)
+    pages_dir = run_dir / "pages"
+    crops_dir = run_dir / "crops"
+    if not crops_dir.exists():
+        crops_dir.mkdir(parents=True, exist_ok=True)
+    copy_directory(_last_modified_directory(DATA_ORIGINALS / site), pages_dir)
 
     # 2) Run YOLO and save crops
+    print(f"[INFO] [pipeline] Running YOLO on pages in {pages_dir}...")
     yolo = YoloService(conf=conf)
     items = []
-    pages_dir = _last_modified_directory(DATA_ORIGINALS)
-    from app.ocr import OcrService
     for i, page_path in enumerate(sorted(pages_dir.glob("*.jpg")), 1):
         img = Image.open(page_path).convert("RGB")
         dets = yolo.predict_pil(img, conf=conf)
@@ -140,23 +140,39 @@ def run_once(site: str = "lidl", conf: float = 0.25) -> dict:
             name = f"p{i:02d}_b{j:03d}.jpg"
             outp = crops_dir / name
             crop.save(outp, "JPEG", quality=90)
-            print(f"[INFO] [pipeline] Saved crop: {outp}, running OCR...")
-            ocr_result = PaddleOcrService.infer(crop)
-            items.append({
-                "page": i,
-                "file": f"/static/runs/{run_dir.name}/crops/{name}",
-                "class_id": d["class_id"],
-                "score": d["score"],
-                "box": d["box"],
-                "ocr": ocr_result
-            })
-
-     # NEW: OCR over crops
-    ocr_json = run_dir / "ocr.json"
-    ocr_csv  = run_dir / "ocr.csv"
-
+            
     meta = {"run_id": run_dir.name, "site": site, "count": len(items), "items": items}
-    (run_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
+    meta_path = run_dir / "meta.json"
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
+
+    
+    # Run OCR pipeline on the generated crops
+    from utils.ocr_pipeline import run_ocr_on_crops
+    
+    ocr_csv = run_dir / "ocr_results.csv"
+    
+    if crops_dir.exists() and list(crops_dir.glob("*.jpg")):
+        print(f"[INFO] [pipeline] Running OCR on crops in {crops_dir}...")
+        try:
+            ocr_results = run_ocr_on_crops(
+                crops_dir=crops_dir,
+                output_csv=ocr_csv,
+                model_path="models/ocr/best.onnx",
+                conf_threshold=0.75,
+                img_size=640,
+                lang="de"
+            )
+            # Update meta.json with OCR info
+            if meta_path.exists():
+                meta_data = json.loads(meta_path.read_text("utf-8"))
+                meta_data["ocr_count"] = len(ocr_results)
+                meta_data["ocr_csv"] = f"/static/runs/{run_dir.name}/ocr_results.csv"
+                meta_path.write_text(json.dumps(meta_data, ensure_ascii=False, indent=2), "utf-8")
+            print(f"[INFO] [pipeline] OCR completed. {len(ocr_results)} products processed.")
+        except Exception as e:
+            print(f"[ERROR] [pipeline] OCR failed: {e}")
+
+    
     return meta
 
 def scrape_only(site: str = "lidl") -> dict:

@@ -18,6 +18,8 @@ dependencies:
     - uvicorn
     - python-multipart
     - jinja2
+    - PyMuPDF
+    - fitz
     - opencv-python
     - pillow
     - numpy

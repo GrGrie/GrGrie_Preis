@@ -15,6 +15,10 @@ dependencies:
     - paddleocr
     - fastapi
     - uvicorn
+    - selenium
+    - webdriver-manager
+    - fitz
+    - PyMuPDF
     - python-multipart
     - jinja2
     - opencv-python-headless

@@ -1,80 +1,253 @@
 <!doctype html>
 <html>
+
 <head>
-  <meta charset="utf-8"/>
+  <meta charset="utf-8" />
   <title>Prospekt Scraper & Detector</title>
   <link rel="icon" href="{{ url_for('static', path='favicon.ico') }}">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
       padding: 2rem;
     }
+
     .container {
-      max-width: 1000px; margin: 0 auto; background: white;
-      border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden;
+      max-width: 1000px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
     }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; text-align: center; }
-    .header h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
-    .header p { opacity: 0.9; font-size: 1rem; }
-    .content { padding: 2rem; }
-    .section { margin-bottom: 2rem; }
-    .section-title { font-size: 1.25rem; font-weight: 600; color: #333; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #667eea; }
-    .form-group { margin-bottom: 1.5rem; }
-    label { display: block; font-weight: 600; color: #555; margin-bottom: 0.5rem; font-size: 0.95rem; }
-    select, input {
-      width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem;
-      transition: all 0.3s ease; background: white;
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2rem;
+      text-align: center;
     }
-    select:focus, input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
-    select:hover, input:hover { border-color: #b0b0b0; }
-    .button-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1.5rem; }
+
+    .header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 1rem;
+    }
+
+    .content {
+      padding: 2rem;
+    }
+
+    .section {
+      margin-bottom: 2rem;
+    }
+
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #667eea;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 0.5rem;
+      font-size: 0.95rem;
+    }
+
+    select,
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      background: white;
+    }
+
+    select:focus,
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    select:hover,
+    input:hover {
+      border-color: #b0b0b0;
+    }
+
+    .button-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
     button {
-      padding: 0.875rem 1.5rem; font-size: 1rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer;
-      transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 0.875rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
-    button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-    button:active { transform: translateY(0); }
-    button[disabled] { opacity: 0.6; cursor: not-allowed; transform: none; }
-    .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-    .btn-secondary { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
-    .btn-tertiary { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
-    .btn-four { background: linear-gradient(135deg, #a6e987ff 0%, #6f9604ff 100%); color: white; }
-    .status { margin-top: 1rem; color: #444; font-size: 0.95rem; display: none; }
-    .status.show { display: block; }
-    .runs-grid { display: grid; gap: 0.75rem; }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      color: white;
+    }
+
+    .btn-tertiary {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: white;
+    }
+
+    .btn-four {
+      background: linear-gradient(135deg, #a6e987ff 0%, #6f9604ff 100%);
+      color: white;
+    }
+
+    .status {
+      margin-top: 1rem;
+      color: #444;
+      font-size: 0.95rem;
+      display: none;
+    }
+
+    .status.show {
+      display: block;
+    }
+
+    .runs-grid {
+      display: grid;
+      gap: 0.75rem;
+    }
+
     .run-item {
-      background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; padding: 1rem; transition: all 0.2s ease;
+      background: #f8f9fa;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 1rem;
+      transition: all 0.2s ease;
     }
-    .run-item:hover { border-color: #667eea; background: #f0f4ff; transform: translateX(4px); }
-    .run-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-    .run-name { font-weight: 600; color: #333; font-size: 1rem; }
-    .run-links { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+
+    .run-item:hover {
+      border-color: #667eea;
+      background: #f0f4ff;
+      transform: translateX(4px);
+    }
+
+    .run-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .run-name {
+      font-weight: 600;
+      color: #333;
+      font-size: 1rem;
+    }
+
+    .run-links {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
     .run-links a {
-      color: #667eea; text-decoration: none; font-size: 0.9rem; padding: 0.25rem 0.5rem; border-radius: 4px; transition: all 0.2s ease;
+      color: #667eea;
+      text-decoration: none;
+      font-size: 0.9rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      transition: all 0.2s ease;
     }
-    .run-links a:hover { background: #667eea; color: white; }
-    .muted { color: #999; font-style: italic; text-align: center; padding: 2rem; }
+
+    .run-links a:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    .muted {
+      color: #999;
+      font-style: italic;
+      text-align: center;
+      padding: 2rem;
+    }
+
     @media (max-width: 768px) {
-      body { padding: 1rem; }
-      .content { padding: 1.5rem; }
-      .button-group { grid-template-columns: 1fr; }
+      body {
+        padding: 1rem;
+      }
+
+      .content {
+        padding: 1.5rem;
+      }
+
+      .button-group {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="container">
     <div class="header">
       <h1>🛒 Prospekt Scraper & Detector</h1>
       <p>Automated product detection from retail flyers</p>
     </div>
-    
+
     <div class="content">
       <div class="section">
         <h2 class="section-title">Configuration</h2>
-        
+
         <div class="form-group">
           <label for="site">Select Website</label>
           <select id="site" name="site" required>
@@ -97,26 +270,26 @@
             <input type="hidden" name="site" data-bind="site">
             <button type="submit" class="btn-primary">📥 Scrape Only</button>
           </form>
-          
-          <!-- Scrape & Detect -->
+
+          <!-- Scrape + Crop + OCR -->
           <form class="async-form" action="/scrape-crop-ocr" method="post" style="display: contents;">
             <input type="hidden" name="site" data-bind="site">
             <input type="hidden" name="conf" data-bind="conf">
-            <button type="submit" class="btn-secondary">🔍 Scrape & Detect</button>
+            <button type="submit" class="btn-secondary">🔍 Scrape + Crop + OCR</button>
           </form>
-          
+
           <!-- Crop latest run -->
           <form class="async-form" action="/crop" method="post" style="display: contents;">
-              <input type="hidden" name="site" data-bind="site">
-              <input type="hidden" name="conf" data-bind="conf">
-              <button type="submit" class="btn-tertiary">✂️ Crop Latest Run</button>
+            <input type="hidden" name="site" data-bind="site">
+            <input type="hidden" name="conf" data-bind="conf">
+            <button type="submit" class="btn-tertiary">✂️ Crop Latest Run</button>
           </form>
 
           <!-- OCR latest run -->
           <form class="async-form" action="/ocr-latest" method="post" style="display: contents;">
-              <input type="hidden" name="site" data-bind="site">
-              <input type="hidden" name="conf" data-bind="conf">
-              <button type="submit" class="btn-four">🔍 OCR Latest Run</button>
+            <input type="hidden" name="site" data-bind="site">
+            <input type="hidden" name="conf" data-bind="conf">
+            <button type="submit" class="btn-four">🔍 OCR Latest Run</button>
           </form>
         </div>
 
@@ -202,16 +375,16 @@
           });
 
           // (Optional) Hide runs with empty names (client-side safety)
-          (function() {
+          (function () {
             var container = document.getElementById('runs-container');
             if (!container) return;
             var runItems = container.querySelectorAll('.run-item');
             var hasValidRuns = false;
-            runItems.forEach(function(item) {
+            runItems.forEach(function (item) {
               var runName = item.querySelector('.run-name');
               if (runName && runName.textContent.trim() &&
-                  !runName.textContent.includes('{{') &&
-                  !runName.textContent.includes('{%')) {
+                !runName.textContent.includes('{{') &&
+                !runName.textContent.includes('{%')) {
                 hasValidRuns = true;
               } else {
                 item.style.display = 'none';
@@ -233,4 +406,5 @@
     </div>
   </div>
 </body>
+
 </html>

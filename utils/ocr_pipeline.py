@@ -22,7 +22,7 @@ except ImportError:
 def setup_args():
     parser = argparse.ArgumentParser(description="Detect and OCR product names and prices")
     parser.add_argument("--input", "-i", type=str, required=True, help="Path to image or directory")
-    parser.add_argument("--model", "-m", type=str, required=True, help="Path to YOLO ONNX model")
+    parser.add_argument("--model", "-m", type=str, default="models/ocr/best.onnx", help="Path to YOLO ONNX model")
     parser.add_argument("--output", "-o", type=str, default="ocr_results.csv", help="Output CSV file")
     parser.add_argument("--conf", type=float, default=0.25, help="Confidence threshold")
     parser.add_argument("--img-size", type=int, default=640, help="Input image size")
@@ -194,6 +194,138 @@ def clean_price(text):
     if match:
         return f"{match.group(1)}.{match.group(2)}"
     return text
+
+def run_ocr_on_crops(crops_dir: Path, output_csv: Path, model_path: str = "models/ocr/best.onnx", 
+                     conf_threshold: float = 0.25, img_size: int = 640, lang: str = "de"):
+    """
+    Run OCR pipeline on a directory of crop images.
+    
+    Args:
+        crops_dir: Path to directory containing crop images
+        output_csv: Path where CSV results should be saved
+        model_path: Path to YOLO ONNX model
+        conf_threshold: Confidence threshold for detections
+        img_size: Input image size for YOLO
+        lang: OCR language
+        
+    Returns:
+        List of dicts with keys: filename, name, price
+    """
+    crops_dir = Path(crops_dir)
+    output_csv = Path(output_csv)
+    
+    # Ensure model compatibility (Export/Patch)
+    ensure_model_compatibility(model_path)
+    
+    # Load ONNX model
+    print(f"[INFO] [ocr_pipeline] Loading YOLO ONNX model: {model_path}")
+    try:
+        session = ort.InferenceSession(model_path, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+    except Exception as e:
+        print(f"[ERROR] [ocr_pipeline] Failed to load model: {e}")
+        raise
+    
+    input_name = session.get_inputs()[0].name
+    
+    # Initialize PaddleOCR
+    print("[INFO] [ocr_pipeline] Initializing PaddleOCR...")
+    ocr = PaddleOCR(use_angle_cls=True, lang=lang)
+    print("[INFO] [ocr_pipeline] PaddleOCR initialized.")
+    
+    # Get crop files
+    files = sorted([p for p in crops_dir.glob("*") if p.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp']])
+    print(f"[INFO] [ocr_pipeline] Processing {len(files)} crop images...")
+    
+    results = []
+    
+    for i, file_path in enumerate(files):
+        print(f"[INFO] [ocr_pipeline] [{i+1}/{len(files)}] Processing {file_path.name}...")
+        
+        # Read image
+        img = cv2.imread(str(file_path))
+        if img is None:
+            print(f"[WARN] [ocr_pipeline] Could not read {file_path}")
+            continue
+        
+        img_h, img_w = img.shape[:2]
+        
+        # Preprocess for YOLO
+        input_tensor, ratio, (dw, dh) = preprocess(img, img_size)
+        
+        # Run YOLO inference
+        outputs = session.run(None, {input_name: input_tensor})
+        
+        # Postprocess YOLO output
+        boxes, confidences, class_ids = postprocess(
+            outputs[0], 
+            (img_h, img_w), 
+            (img_size, img_size),
+            conf_threshold
+        )
+        
+        # Process detections
+        names = []
+        prices = []
+        
+        for box, conf, cls_id in zip(boxes, confidences, class_ids):
+            x1, y1, x2, y2 = map(int, box)
+            
+            # Crop region in memory
+            crop = img[y1:y2, x1:x2]
+            if crop.size == 0:
+                continue
+            
+            # Run OCR on crop
+            ocr_result = ocr.ocr(crop)
+            
+            # Extract text
+            text = ""
+            if ocr_result and ocr_result[0]:
+                text = " ".join([line[1][0] for line in ocr_result[0]])
+            
+            # Store detection with OCR result
+            detection = {
+                'class_id': int(cls_id),
+                'conf': float(conf),
+                'box': [x1, y1, x2, y2],
+                'text': text
+            }
+            
+            if cls_id == 0:  # Name
+                names.append(detection)
+            elif cls_id == 1:  # Price
+                prices.append(detection)
+        
+        # Combine results
+        names.sort(key=lambda x: x['box'][1])
+        full_name = " ".join([n['text'] for n in names])
+        
+        best_price = ""
+        if prices:
+            prices.sort(key=lambda x: (x['box'][3] - x['box'][1]), reverse=True)
+            raw_price = prices[0]['text']
+            best_price = clean_price(raw_price)
+        
+        print(f"[INFO] [ocr_pipeline]  -> Name: {full_name}")
+        print(f"[INFO] [ocr_pipeline]  -> Price: {best_price}")
+        
+        results.append({
+            "filename": file_path.stem,
+            "name": full_name,
+            "price": best_price
+        })
+    
+    # Save to CSV
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_csv, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=['filename', 'name', 'price'])
+        writer.writeheader()
+        writer.writerows(results)
+    
+    print(f"[INFO] [ocr_pipeline] ✓ Results saved to {output_csv}")
+    print(f"[INFO] [ocr_pipeline] ✓ Processed {len(results)} images")
+    
+    return results
 
 def main():
     args = setup_args()
