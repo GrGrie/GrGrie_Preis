@@ -1,0 +1,32 @@
+name: grgrie-train
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pytorch
+  - torchvision
+  - pytorch-cuda=12.1
+  - pip
+  - pip:
+    - ultralytics
+    - paddlepaddle-gpu
+    - paddleocr
+    - fastapi
+    - uvicorn
+    - python-multipart
+    - jinja2
+    - PyMuPDF
+    - fitz
+    - opencv-python
+    - pillow
+    - numpy
+    - python-telegram-bot
+    - selenium
+    - webdriver-manager
+    - boto3
+    - python-dotenv
+    - requests
+    - ipykernel

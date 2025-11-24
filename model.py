@@ -17,10 +17,11 @@ def main():
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
     parser.add_argument("--test_grouping", action="store_true", help="Test grouping after training")
     parser.add_argument("--name", type=str, default="latest_yolo_run", help="Name of the training run")
+    parser.add_argument("--optimizer", type=str, default="AdamW", choices=["SGD", "Adam", "AdamW"], help="Optimizer to use for training")
     
     # Evaluation parameters
     parser.add_argument("--eval", action="store_true", help="Run in inference mode")
-    parser.add_argument("--eval_model", type=str, default="runs/detect/latest_yolo_run/weights/best.pt", help="Path to trained model for evaluation")
+    parser.add_argument("--eval_model", type=str, default="data/runs/yolo_training/latest_yolo_run/weights/best.pt", help="Path to trained model for evaluation")
     parser.add_argument("--eval_data", type=str, help="Path to folder containing images for evaluation")
     parser.add_argument("--eval_conf", type=float, default=0.25, help="Confidence threshold for evaluation")
     
@@ -33,7 +34,6 @@ def main():
     parser.add_argument("--lr", type=float, default=0.01, help="Learning rate for training")
     parser.add_argument("--momentum", type=float, default=0.937, help="Momentum for SGD optimizer")
     parser.add_argument("--weight_decay", type=float, default=0.0005, help="Weight decay for optimizer")
-    parser.add_argument("--patience", type=int, default=20, help="Early stopping patience")
     parser.add_argument("--save_period", type=int, default=10, help="Model save period every N epochs")
     parser.add_argument("--save_dir", type=str, default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "runs", "yolo_training"), help="Directory to save trained models")
     args = parser.parse_args()
@@ -43,7 +43,6 @@ def main():
         raise ValueError("Train, validation, and test ratios must sum to 1.0")
 
     print("Starting YOLOv11 training.." if not args.eval else "Starting YOLOv11 evaluation..")
-    print(f"Using dataset config: {args.config}")
     
     # Handle evaluation mode
     if args.eval:
@@ -53,12 +52,13 @@ def main():
         
         evaluate_model(args.eval_model, args.eval_data, args.eval_conf)
         return
-
-    # Prepare dataset from all week folders
-    prepare_global_dataset(args.train_ratio, args.val_ratio, args.test_ratio)
-
+    
     # Load pretrained model
-    model = YOLO("yolo11m.pt")
+    model = YOLO("yolo11n.pt")
+    
+    # Prepare dataset from all week folders
+    make_pathlists("data/originals", "configs/lists", args.train_ratio, args.val_ratio, args.test_ratio)
+    
 
     # Start training
     results = model.train(
@@ -67,7 +67,6 @@ def main():
         imgsz=args.image_size,
         batch=args.batch_size,
         device='cuda' if torch.cuda.is_available() else 'cpu',
-        patience=args.patience,
         save=True,
         save_period=args.save_period,
         workers=args.num_workers,
@@ -83,7 +82,7 @@ def main():
     best_model_path = os.path.join(args.save_dir, args.name, 'weights', 'best.pt')
     print(f"Best model saved at: {best_model_path}")
 
-def evaluate_model(model_path = "runs/detect/latest_yolo_run/weights/best.pt", data_path="", conf_threshold=0.25):
+def evaluate_model(model_path = "models/best.pt", data_path="", conf_threshold=0.25):
     """
     Evaluate a trained YOLO model on images and save results.
     
@@ -218,154 +217,57 @@ def evaluate_model(model_path = "runs/detect/latest_yolo_run/weights/best.pt", d
     summary_path = eval_results_dir / "summary.txt"
     write_evaluation_summary(summary_path, model_path, data_path, conf_threshold, image_files, all_detections)
 
-def prepare_global_dataset(train_ratio, val_ratio, test_ratio):
+def make_pathlists(
+    originals_root: str = "data/originals",
+    out_dir: str = "configs/lists",
+    train_ratio: float = 0.8,
+    val_ratio: float = 0.1,
+    test_ratio: float = 0.1,
+    seed: int = 42,
+):
     """
-    Aggregate all data from week folders and create global train/val/test split.
-    Only class 5 (Product) labels are kept and converted to class 0.
-    
-    Args:
-        train_ratio (float): Ratio of training data
-        val_ratio (float): Ratio of validation data  
-        test_ratio (float): Ratio of test data
+    Traverse data/originals/<shop>/<week>/ and write:
+    configs/lists/train.txt, val.txt, test.txt — absolute paths to images line by
+    line. Only images that have a corresponding .txt file are included.
     """
-    print("Preparing global dataset...")
-    
-    originals_dir = Path("data/originals")
-    if not originals_dir.exists():
-        raise FileNotFoundError(f"Directory '{originals_dir}' does not exist.")
-    
-    # Collect all image-label pairs from all week folders
-    all_image_label_pairs = []
-    
-    # Find all subdirectories (lidl, netto, etc.)
-    subdirectories = [d for d in originals_dir.iterdir() if d.is_dir()]
+    root = Path(originals_root).resolve()
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
 
-    print(f"Found {len(subdirectories)} subdirectories: {subdirectories}")
+    # Collect all valid images (jpg/jpeg/png) that have a paired .txt
+    exts = (".jpg", ".jpeg", ".png")
+    imgs: list[Path] = []
+    for shop_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        for week_dir in sorted(p for p in shop_dir.iterdir() if p.is_dir()):
+            for img in week_dir.iterdir():
+                if img.suffix.lower() in exts:
+                    lbl = img.with_suffix(".txt")
+                    if lbl.exists():
+                        imgs.append(img.resolve())
 
-    for subdir in subdirectories:
-        # Find all week folders (without _labels suffix)
-        week_folders = [
-            name for name in os.listdir(subdir) 
-            if subdir.joinpath(name).is_dir() and not name.endswith("_labels")
-        ]
-        
-        print(f"Found {len(week_folders)} week folders in '{subdir.name}': {week_folders}")
-        
-        for week in week_folders:
-            week_path = subdir / week
-            labels_path = subdir / f"{week}_labels"
-            
-            if not week_path.exists():
-                print(f"Warning: Week folder '{week_path}' does not exist. Skipping.")
-                continue
-                
-            if not labels_path.exists():
-                print(f"Warning: Labels folder '{labels_path}' does not exist. Skipping {week}.")
-                continue
-            
-            # Get all PNG images in the week folder
-            images = list(week_path.glob("*.png"))
-            print(f"Week {week}: Found {len(images)} images")
-            
-            # Check for corresponding labels
-            valid_pairs = 0
-            for img_path in images:
-                label_path = labels_path / f"{img_path.stem}.txt"
-                if label_path.exists():
-                    # Check if the label file contains class 5 (Product)
-                    if has_product_class(label_path):
-                        all_image_label_pairs.append((img_path, label_path))
-                        valid_pairs += 1
-            
-            print(f"Week {week}: {valid_pairs} valid image-label pairs with Product class")
-    
-    if not all_image_label_pairs:
-        raise ValueError("No valid image-label pairs found with Product class (class 5)")
-    
-    print(f"Total valid image-label pairs: {len(all_image_label_pairs)}")
-    
-    # Shuffle and split the data
-    random.shuffle(all_image_label_pairs)
-    
-    total_samples = len(all_image_label_pairs)
-    train_end = int(train_ratio * total_samples)
-    val_end = train_end + int(val_ratio * total_samples)
-    
-    train_pairs = all_image_label_pairs[:train_end]
-    val_pairs = all_image_label_pairs[train_end:val_end]
-    test_pairs = all_image_label_pairs[val_end:]
-    
-    print(f"Dataset split: Train={len(train_pairs)}, Val={len(val_pairs)}, Test={len(test_pairs)}")
-    
-    # Create output directories
-    data_dir = Path("data")
-    for split in ["train", "val", "test"]:
-        for subdir in ["images", "labels"]:
-            output_dir = data_dir / split / subdir
-            output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Copy files to respective directories
-    for split_name, pairs in [("train", train_pairs), ("val", val_pairs), ("test", test_pairs)]:
-        print(f"Copying {len(pairs)} files to {split_name} set...")
-        
-        for img_path, label_path in pairs:
-            # Make unique filename by prefixing with week folder name
-            week_prefix = img_path.parent.name  # e.g., '2025-06-09_2025-06-15'
-            unique_img_name = f"{week_prefix}_{img_path.name}"
-            unique_label_name = f"{week_prefix}_{label_path.name}"
+    if not imgs:
+        raise RuntimeError(f"No image/label pairs under {root}")
 
-            # Copy image
-            img_dest = data_dir / split_name / "images" / unique_img_name
-            shutil.copy2(img_path, img_dest)
+    # Stable split
+    rng = random.Random(seed)
+    rng.shuffle(imgs)
+    n = len(imgs)
+    n_tr = int(n * train_ratio)
+    n_va = int(n * val_ratio)
+    splits = {
+        "train": imgs[:n_tr],
+        "val":   imgs[n_tr:n_tr + n_va],
+        "test":  imgs[n_tr + n_va:],
+    }
 
-            # Process and copy label (filter only class 5 and convert to class 0)
-            label_dest = data_dir / split_name / "labels" / unique_label_name
-            process_label_file(label_path, label_dest)
-    
-    print("Dataset preparation completed!")
-    print(f"Data organized in:")
-    print(f"  - /data/train: {len(train_pairs)} samples")
-    print(f"  - /data/val: {len(val_pairs)} samples") 
-    print(f"  - /data/test: {len(test_pairs)} samples")
+    # Write lists (as_posix to use / on Windows)
+    for split, arr in splits.items():
+        with open(out / f"{split}.txt", "w", encoding="utf-8") as f:
+            for p in arr:
+                f.write(p.as_posix() + "\n")
 
-def has_product_class(label_path):
-    """
-    Check if a label file contains class 5 (Product).
-    
-    Args:
-        label_path (Path): Path to the label file
-        
-    Returns:
-        bool: True if class 5 is present, False otherwise
-    """
-    try:
-        with open(label_path, 'r') as f:
-            for line in f:
-                parts = line.strip().split()
-                if parts and parts[0] == "5":
-                    return True
-        return False
-    except Exception as e:
-        print(f"Error reading label file {label_path}: {e}")
-        return False
-
-def process_label_file(input_path, output_path):
-    """
-    Process a label file to keep only class 5 (Product) and convert it to class 0.
-    
-    Args:
-        input_path (Path): Input label file path
-        output_path (Path): Output label file path
-    """
-    try:
-        with open(input_path, 'r') as fin, open(output_path, 'w') as fout:
-            for line in fin:
-                parts = line.strip().split()
-                if parts and parts[0] == "5":
-                    # Convert class 5 to class 0 for single-class training
-                    fout.write("0 " + " ".join(parts[1:]) + "\n")
-    except Exception as e:
-        print(f"Error processing label file {input_path}: {e}")
+    print("Pathlists written:", {k: len(v) for k, v in splits.items()})
+    return out / "train.txt", out / "val.txt", out / "test.txt"
 
 def write_evaluation_summary(summary_path, model_path, data_path, conf_threshold, image_files, all_detections):
     """

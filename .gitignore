@@ -3,6 +3,7 @@ data/
 eval-results/
 runs/
 static/
+temp_dataset/
 
 # Ignore Python bytecode
 __pycache__/
@@ -10,4 +11,12 @@ __pycache__/
 
 # Ignore yolo models
 yolo11n.pt
+yolo11s.pt
 yolo11m.pt
+
+# Ignore codex-agents
+Agents.md
+
+# Ignore testing results
+results/
+full_ocr_results.csv

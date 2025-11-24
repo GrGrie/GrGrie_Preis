@@ -1,5 +1,4 @@
 import os
-
 import requests
 from datetime import datetime, timedelta
 from typing import Optional, Dict
@@ -7,7 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from ultralytics import YOLO
+
 
 
 class ImageDownloader:
@@ -35,7 +34,6 @@ class ImageDownloader:
         except Exception as e:
             print(f"Error downloading {url}: {e}")
             return False
-
 class DirectoryManager:
     """Manages directory creation and file paths"""
 
@@ -82,9 +80,15 @@ class WebDriverManager:
             options.add_argument("--headless=new")
         # Suppress GCM/GCM registration errors
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+          "AppleWebKit/537.36 (KHTML, like Gecko) "
+          "Chrome/140.0.0.0 Safari/537.36")
+        options.add_argument(f"--user-agent={ua}")
         
         # Additional useful options for scraping
         options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option("useAutomationExtension", False)
         options.add_argument('--log-level=3')  # Only show fatal errors
         
         options.add_argument("--no-sandbox")
@@ -92,15 +96,13 @@ class WebDriverManager:
         options.add_argument(f"--window-size={self.window_size}")
         service = Service(ChromeDriverManager().install())
         return webdriver.Chrome(service=service, options=options)
-
-
-
 class ONNXExporter:
     """Handles ONNX export functionality"""
 
     @staticmethod
     def export_to_onnx(pt_path="models/best.pt", onnx_path="models/best.onnx"):
         """Exports a YOLO model from .pt to .onnx format"""
+        from ultralytics import YOLO
         model = YOLO(pt_path)
         model.export(format="onnx", dynamic=True)
         print(f"Exported {pt_path} to {onnx_path}")

@@ -1,0 +1,31 @@
+name: grgrie-inference
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - --extra-index-url https://download.pytorch.org/whl/cpu
+    - torch
+    - torchvision
+    - onnxruntime
+    - ultralytics
+    - paddlepaddle
+    - paddleocr
+    - fastapi
+    - uvicorn
+    - selenium
+    - webdriver-manager
+    - fitz
+    - PyMuPDF
+    - python-multipart
+    - jinja2
+    - opencv-python-headless
+    - pillow
+    - numpy<2.0
+    - paddlepaddle==2.6.2
+    - paddleocr==2.9.1
+    - python-telegram-bot
+    - python-dotenv
+    - requests
