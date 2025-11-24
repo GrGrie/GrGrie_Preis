@@ -3,33 +3,18 @@ import os, sys, json, time, uuid, subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from PIL import Image
-from fastapi import requests
-import requests as req
-from ultralytics import YOLO
+import cv2
 import numpy as np
-import onnxruntime as ort
+
+# Import YoloONNX and run_ocr_on_crops from utils
+from utils.ocr_pipeline import YoloONNX, run_ocr_on_crops
 
 #  Directory to save inference results (images with boxes, labels, etc.)
 RUNS_DIR = Path(os.getenv("RUNS_DIR", "static/runs")).resolve()
 DATA_ORIGINALS = Path(os.getenv("DATA_ORIGINALS", "static")).resolve()
-MODEL_PATH = "models/best.onnx"
+CROP_MODEL_PATH = "models/best.onnx" # Default to crop model path
+OCR_MODEL_PATH = "models/ocr/best.onnx" # Default to OCR model path
 OCR_API_KEY = "K83109457288957"
-
-class YoloService:
-    def __init__(self, conf: float = 0.25):
-        self.conf = conf
-        self.model = YOLO(MODEL_PATH)
-        self.model.task = "detect"
-    
-    def predict_pil(self, img: Image.Image, conf: float | None = None):
-        results = self.model(img, conf=self.conf if conf is None else conf)
-        dets = []
-        for r in results:
-            if r.boxes is None: continue
-            for b in r.boxes:
-                x1,y1,x2,y2 = map(int, b.xyxy[0].tolist())
-                dets.append({"class_id": int(b.cls), "score": float(b.conf), "box": [x1,y1,x2,y2]})
-        return dets
 
 def _new_run_dir() -> Path:
     """Create a new unique run directory and return its Path"""
@@ -129,26 +114,41 @@ def scrape_crop_ocr(site: str = "lidl", conf: float = 0.75) -> dict:
 
     # 2) Run YOLO and save crops
     print(f"[INFO] [pipeline] Running YOLO on pages in {pages_dir}...")
-    yolo = YoloService(conf=conf)
-    items = []
-    for i, page_path in enumerate(sorted(pages_dir.glob("*.jpg")), 1):
-        img = Image.open(page_path).convert("RGB")
-        dets = yolo.predict_pil(img, conf=conf)
-        for j, d in enumerate(dets, 1):
-            x1, y1, x2, y2 = d["box"]
-            crop = img.crop((x1, y1, x2, y2))
-            name = f"p{i:02d}_b{j:03d}.jpg"
-            outp = crops_dir / name
-            crop.save(outp, "JPEG", quality=90)
+    try:
+        yolo = YoloONNX(CROP_MODEL_PATH, conf_thres=conf)
+        items = []
+        for i, page_path in enumerate(sorted(pages_dir.glob("*.jpg")), 1):
+            img = cv2.imread(str(page_path))
+            if img is None: continue
             
-    meta = {"run_id": run_dir.name, "site": site, "count": len(items), "items": items}
-    meta_path = run_dir / "meta.json"
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
+            boxes, confidences, class_ids = yolo.predict(img)
+            
+            for j, (box, score, cls) in enumerate(zip(boxes, confidences, class_ids), 1):
+                x1, y1, x2, y2 = map(int, box)
+                crop = img[y1:y2, x1:x2]
+                if crop.size == 0: continue
+                
+                name = f"p{i:02d}_b{j:03d}.jpg"
+                outp = crops_dir / name
+                cv2.imwrite(str(outp), crop)
+                
+                items.append({
+                    "page": i,
+                    "file": f"/static/runs/{run_dir.name}/crops/{name}",
+                    "class_id": int(cls),
+                    "score": float(score),
+                    "box": [x1, y1, x2, y2]
+                })
+                
+        meta = {"run_id": run_dir.name, "site": site, "count": len(items), "items": items}
+        meta_path = run_dir / "meta.json"
+        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
+    except Exception as e:
+        print(f"[ERROR] [pipeline] YOLO inference failed: {e}")
+        return {"error": str(e)}
 
     
-    # Run OCR pipeline on the generated crops
-    from utils.ocr_pipeline import run_ocr_on_crops
-    
+    # 3) Run OCR pipeline on the generated crops
     ocr_csv = run_dir / "ocr_results.csv"
     
     if crops_dir.exists() and list(crops_dir.glob("*.jpg")):
@@ -157,8 +157,8 @@ def scrape_crop_ocr(site: str = "lidl", conf: float = 0.75) -> dict:
             ocr_results = run_ocr_on_crops(
                 crops_dir=crops_dir,
                 output_csv=ocr_csv,
-                model_path="models/ocr/best.onnx",
-                conf_threshold=0.75,
+                model_path=OCR_MODEL_PATH,
+                conf_threshold=conf,
                 img_size=640,
                 lang="de"
             )
@@ -172,7 +172,6 @@ def scrape_crop_ocr(site: str = "lidl", conf: float = 0.75) -> dict:
         except Exception as e:
             print(f"[ERROR] [pipeline] OCR failed: {e}")
 
-    
     return meta
 
 def scrape_only(site: str = "lidl") -> dict:
@@ -199,54 +198,68 @@ def scrape_only(site: str = "lidl") -> dict:
 
 def crop_only(site: str = "lidl", conf: float = 0.25) -> dict:
     """
-    Run cropping only on the latest , without scraping new pages.
+    Run cropping only on the latest run, without scraping new pages.
     Saves updated meta.json with count/items/ocr.
     """
     latest_run = _last_modified_directory(RUNS_DIR)
     run_dir = _last_modified_directory(latest_run)
 
     # Run YOLO and save crops
-    yolo = YoloService(conf=conf)
-    items = []
     print(f"[INFO] [pipeline] Running YOLO on pages in '{run_dir}':")
-    for i, page_path in enumerate(sorted(run_dir.glob("*.jpg")), 1):
-        img = Image.open(page_path).convert("RGB")
-        print(f"[INFO] [pipeline]  Found page: {page_path.name} ({img.width}x{img.height})")
-        dets = yolo.predict_pil(img)
-        for j, d in enumerate(dets, 1):
-            x1, y1, x2, y2 = d["box"]
-            if x2 <= x1 or y2 <= y1:
-                print(f"[WARN] Skip empty crop: {x1},{y1},{x2},{y2}")
-                continue
-            crop = img.crop((x1, y1, x2, y2))
-            if crop.width == 0 or crop.height == 0:
-                print(f"[WARN] Skip zero-size crop after PIL: {x1},{y1},{x2},{y2}")
-                continue
-            name = f"p{i:02d}_b{j:03d}.jpg"
-            if not (latest_run / "crops").exists():
-                (latest_run / "crops").mkdir(parents=True, exist_ok=True)
-            outp = latest_run / "crops" / name
-            crop.save(outp, "JPEG", quality=90)
-            items.append({
-                "page": i,
-                "file": f"/static/runs/{latest_run.name}/crops/{name}",
-                "class_id": d["class_id"],
-                "score": d["score"],
-                "box": d["box"]
-            })
+    try:
+        yolo = YoloONNX(CROP_MODEL_PATH, conf_thres=conf)
+        items = []
+        
+        for i, page_path in enumerate(sorted(run_dir.glob("*.jpg")), 1):
+            img = cv2.imread(str(page_path))
+            if img is None: continue
+            print(f"[INFO] [pipeline]  Found page: {page_path.name} ({img.shape[1]}x{img.shape[0]})")
+            
+            boxes, confidences, class_ids = yolo.predict(img)
+            
+            for j, (box, score, cls) in enumerate(zip(boxes, confidences, class_ids), 1):
+                x1, y1, x2, y2 = map(int, box)
+                
+                # Check for empty/invalid boxes
+                if x2 <= x1 or y2 <= y1:
+                    print(f"[WARN] Skip empty crop: {x1},{y1},{x2},{y2}")
+                    continue
+                    
+                crop = img[y1:y2, x1:x2]
+                if crop.size == 0:
+                    print(f"[WARN] Skip zero-size crop: {x1},{y1},{x2},{y2}")
+                    continue
+                    
+                name = f"p{i:02d}_b{j:03d}.jpg"
+                if not (latest_run / "crops").exists():
+                    (latest_run / "crops").mkdir(parents=True, exist_ok=True)
+                outp = latest_run / "crops" / name
+                cv2.imwrite(str(outp), crop)
+                
+                items.append({
+                    "page": i,
+                    "file": f"/static/runs/{latest_run.name}/crops/{name}",
+                    "class_id": int(cls),
+                    "score": float(score),
+                    "box": [x1, y1, x2, y2]
+                })
 
-     # NEW: OCR over crops
-    meta_path = latest_run / "meta.json"
-    meta = json.loads(meta_path.read_text("utf-8")) if meta_path.exists() else {}
-    print(f"[INFO] [pipeline] Found {len(items)} items after cropping in run {latest_run.name}, run_id {latest_run.name[-6:]}")
-    meta.update({
-        "count": len(items),
-        "items": items,
-        "mode": "crop_only",
-        "run_id": latest_run.name[-6:]
-    })
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
-    return meta
+        # Update meta
+        meta_path = latest_run / "meta.json"
+        meta = json.loads(meta_path.read_text("utf-8")) if meta_path.exists() else {}
+        print(f"[INFO] [pipeline] Found {len(items)} items after cropping in run {latest_run.name}, run_id {latest_run.name[-6:]}")
+        meta.update({
+            "count": len(items),
+            "items": items,
+            "mode": "crop_only",
+            "run_id": latest_run.name[-6:]
+        })
+        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
+        return meta
+        
+    except Exception as e:
+        print(f"[ERROR] [pipeline] Crop only failed: {e}")
+        return {"error": str(e)}
 
 def ocr_latest_run() -> dict:
     """
@@ -262,40 +275,44 @@ def ocr_latest_run() -> dict:
         raise RuntimeError(f"No crops directory found in latest run: {run_dir.name}")
 
     # NEW: OCR over crops
-    ocr_json = run_dir / "ocr.json"
+    ocr_csv = run_dir / "ocr_results.csv"
     print(f"[INFO] [pipeline] Running OCR on crops in '{crops_dir}':")
     
-    # Initialize OCR results list
-    ocr_results = []
-    
-    # Process each crop file in the crops directory
-    for crop_file in sorted(crops_dir.glob("*.jpg")):
-        print(f"[INFO] [pipeline] Processing OCR for: {crop_file.name}")
-        try:
-            #print(f"[INFO] [pipeline] Sending {crop_file.name} to OCR.space API. It's type is {type(crop_file.name)}")
-            ocr_result = PaddleOcrService.infer(crop_file)
-            # Parse the JSON response and append to results
-            ocr_data = json.loads(ocr_result)
-            ocr_results.append({
-                "filename": crop_file.name,
-                "ocr_result": ocr_data
+    try:
+        ocr_results = run_ocr_on_crops(
+            crops_dir=crops_dir,
+            output_csv=ocr_csv,
+            model_path=OCR_MODEL_PATH,
+            conf_threshold=0.25, # Default conf
+            img_size=640,
+            lang="de"
+        )
+        
+        # Write results to ocr.json for backward compatibility if needed, 
+        # but run_ocr_on_crops already writes to CSV.
+        # Let's write to ocr.json as well since the frontend might expect it.
+        ocr_json = run_dir / "ocr.json"
+        ocr_json_data = []
+        for res in ocr_results:
+            ocr_json_data.append({
+                "filename": f"{res['filename']}.jpg", # run_ocr_on_crops returns filename without ext? No, it returns stem.
+                "ocr_result": {
+                    "name": res["name"],
+                    "price": res["price"]
+                }
             })
-        except Exception as e:
-            print(f"[ERROR] [pipeline] OCR failed for {crop_file.name}: {e}")
-            ocr_results.append({
-                "filename": crop_file.name,
-                "error": str(e)
-            })
-    
-    # Write all OCR results to ocr.json
-    ocr_json.write_text(json.dumps(ocr_results, ensure_ascii=False, indent=2), "utf-8")
+        ocr_json.write_text(json.dumps(ocr_json_data, ensure_ascii=False, indent=2), "utf-8")
 
-    meta_path = run_dir / "meta.json"
-    meta = json.loads(meta_path.read_text("utf-8")) if meta_path.exists() else {}
-    meta.update({
-        "ocr_count": len(ocr_results),
-        "mode": "ocr_only",
-        "run_id": run_dir.name[-7:]
-    })
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
-    return meta
+        meta_path = run_dir / "meta.json"
+        meta = json.loads(meta_path.read_text("utf-8")) if meta_path.exists() else {}
+        meta.update({
+            "ocr_count": len(ocr_results),
+            "mode": "ocr_only",
+            "run_id": run_dir.name[-7:]
+        })
+        meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
+        return meta
+        
+    except Exception as e:
+        print(f"[ERROR] [pipeline] OCR failed: {e}")
+        return {"error": str(e)}

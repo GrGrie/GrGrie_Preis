@@ -7,6 +7,7 @@ from ultralytics import YOLO
 from paddleocr import PaddleOCR
 from pathlib import Path
 import numpy as np
+from utils.utils import clean_price
 
 def setup_args():
     parser = argparse.ArgumentParser(description="Verify OCR extraction")
@@ -25,15 +26,7 @@ def get_box_center_y(box):
     ys = [p[1] for p in box]
     return sum(ys) / 4
 
-def clean_price(text):
-    # Remove currency symbols and non-numeric chars except , .
-    # Common OCR errors: '1.39' -> '1.39', '1,39' -> '1,39', '1 39' -> '1.39'
-    text = text.replace("€", "").strip()
-    # Check for price pattern
-    match = re.search(r'(\d+)[.,](\d{2})', text)
-    if match:
-        return f"{match.group(1)}.{match.group(2)}"
-    return None
+
 
 def extract_info_heuristic(ocr_result, img_height):
     if not ocr_result:
