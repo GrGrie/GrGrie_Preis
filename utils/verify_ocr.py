@@ -3,10 +3,10 @@ import argparse
 import cv2
 import re
 import csv
+from ultralytics import YOLO
 from paddleocr import PaddleOCR
 from pathlib import Path
 import numpy as np
-from ultralytics import YOLO
 
 def setup_args():
     parser = argparse.ArgumentParser(description="Verify OCR extraction")

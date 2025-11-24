@@ -45,6 +45,12 @@ class LidlScraper(BaseScraper):
     
     def find_scrapable_url(self, driver) -> List[Tuple[str, str]]:
         """Find Lidl prospekt links"""
+        # Check if we are already on a flyer page
+        current_url = driver.current_url
+        if "/view/flyer/page/" in current_url:
+            print(f"[DEBUG] Already on flyer page: {current_url}")
+            return [("Current Flyer", current_url)]
+
         selectors = [
             "a.flyer[data-track-name='Aktionsprospekt']",
             "a.flyer[data-track-type='flyer']",
@@ -163,6 +169,7 @@ class LidlScraper(BaseScraper):
         end   = datetime(int(m.group(6)), int(m.group(5)), int(m.group(4)))
 
         return f"{start:%Y-%m-%d}_{end:%Y-%m-%d}"
+
 class NettoScraper(BaseScraper):
     """Scraper implementation for Netto website"""
     

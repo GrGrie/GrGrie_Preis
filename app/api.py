@@ -1,4 +1,7 @@
 # To run: `uvicorn app.api:app --host 0.0.0.0 --port 8000 --reload`
+# docker build -t grgrie-inference .
+# docker run -p 8000:8000 -v $(pwd)/data:/app/data grgrie-inference
+
 from app.pipeline import crop_only, run_once, scrape_only, ocr_latest_run
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse, JSONResponse

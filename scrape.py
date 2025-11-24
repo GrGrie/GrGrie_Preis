@@ -132,6 +132,22 @@ def main():
     if args.site:
         config.config['download_path'] = os.path.join(config.config['download_path'], args.site)
         os.makedirs(config.config['download_path'], exist_ok=True)
+    elif args.url:
+        # Try to infer site from URL to keep folder organization
+        inferred_site = None
+        if 'lidl' in args.url:
+            inferred_site = 'lidl'
+        elif 'netto' in args.url:
+            inferred_site = 'netto'
+        elif 'aldi' in args.url:
+            inferred_site = 'aldi'
+        elif 'kaufland' in args.url:
+            inferred_site = 'kaufland'
+        
+        if inferred_site:
+            print(f"✓ Retrieved site '{inferred_site}' from URL")
+            config.config['download_path'] = os.path.join(config.config['download_path'], inferred_site)
+            os.makedirs(config.config['download_path'], exist_ok=True)
 
     try:
         scraper = ScraperFactory.create_scraper(url, driver_manager, image_downloader, config.config)
