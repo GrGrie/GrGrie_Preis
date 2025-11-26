@@ -7,12 +7,10 @@ dependencies:
   - pip
   - pip:
     - --extra-index-url https://download.pytorch.org/whl/cpu
-    - torch
-    - torchvision
-    - onnxruntime
-    - ultralytics
-    - paddlepaddle
-    - paddleocr
+    - torch==2.9.1+cpu
+    - torchvision==0.24.1+cpu
+    - onnxruntime==1.23.2
+    - ultralytics==8.3.231
     - fastapi
     - uvicorn
     - selenium
@@ -21,11 +19,12 @@ dependencies:
     - PyMuPDF
     - python-multipart
     - jinja2
-    - opencv-python-headless
+    - opencv-python-headless==4.11.0.86
     - pillow
-    - numpy<2.0
+    - numpy==1.26.4
     - paddlepaddle==2.6.2
     - paddleocr==2.9.1
     - python-telegram-bot
     - python-dotenv
     - requests
+    - pyyaml

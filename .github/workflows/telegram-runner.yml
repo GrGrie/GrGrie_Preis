@@ -1,0 +1,96 @@
+name: Telegram Bot Runner
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Monday 04:00 UTC (~05:00 CET/CEST)
+    - cron: '0 4 * * 1'
+    # Thursday 04:00 UTC (~05:00 CET/CEST)
+    - cron: '0 4 * * 4'
+
+jobs:
+  run-monday-sites:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 4 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        site: [lidl, aldi, netto]
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_FILTER_FILE: filters/keywords.txt
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Chrome for Selenium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg2
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-linux.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable libgl1 libglib2.0-0 libsm6 libxrender1 libxext6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Prepare data folders
+        run: |
+          mkdir -p static data/originals filters
+
+      - name: Run Telegram pipeline (${{ matrix.site }})
+        run: |
+          set -euo pipefail
+          python telegram_runner.py --site ${{ matrix.site }} --conf 0.75 --send-csv
+
+  run-thursday-sites:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 4 * * 4'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      TELEGRAM_FILTER_FILE: filters/keywords.txt
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Chrome for Selenium
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg2
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-linux.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable libgl1 libglib2.0-0 libsm6 libxrender1 libxext6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: Prepare data folders
+        run: |
+          mkdir -p static data/originals filters
+
+      - name: Run Telegram pipeline (kaufland)
+        run: |
+          set -euo pipefail
+          python telegram_runner.py --site kaufland --conf 0.75 --send-csv
