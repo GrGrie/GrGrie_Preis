@@ -86,24 +86,35 @@ def _send_results(
     notifier.send_message(summary)
 
     crops_dir = run_dir / "crops"
+    batch: list[tuple[Path, str]] = []
+
     for idx, row in enumerate(filtered_results, start=1):
         crop_path = _find_crop(crops_dir, row.get("filename", ""))
-        caption_lines = [
-            f"{row.get('name','(no name)')}",
-            f"Price: {row.get('price','?') or '?'}",
-            f"Source crop: {crop_path.name if crop_path else 'not found'}",
-            f"Match #{idx}",
-        ]
-        caption = "\n".join(caption_lines)
+        caption = f"{row.get('name','(no name)')}\nPrice: {row.get('price','?') or '?'}"
         if crop_path and crop_path.exists():
-            notifier.send_photo(crop_path, caption=caption)
+            batch.append((crop_path, caption))
+            if len(batch) == 10:
+                notifier.send_media_group(batch)
+                batch.clear()
         else:
             notifier.send_message(caption)
+
+    if batch:
+        notifier.send_media_group(batch)
 
     if send_csv:
         csv_path = run_dir / "ocr_results.csv"
         if csv_path.exists():
             notifier.send_document(csv_path, caption="Full OCR CSV")
+
+
+def _latest_run_dir() -> Path | None:
+    if not RUNS_DIR.exists():
+        return None
+    run_dirs = [p for p in RUNS_DIR.iterdir() if p.is_dir()]
+    if not run_dirs:
+        return None
+    return max(run_dirs, key=lambda p: p.stat().st_mtime)
 
 
 def _load_filters_from_file(file_path: Path | None) -> list[str]:
@@ -131,12 +142,27 @@ def _parse_filters(cli_filters: Sequence[str] | None, file_path: Path | None) ->
 
 
 def run_once(args, notifier: TelegramNotifier) -> None:
-    meta = scrape_crop_ocr(site=args.site, conf=args.conf)
-    if "error" in meta:
-        notifier.send_message(f"Pipeline failed: {meta['error']}")
-        return
+    run_dir = None
 
-    run_dir = RUNS_DIR / meta["run_id"]
+    if args.reuse_run:
+        if args.reuse_run.lower() == "latest":
+            run_dir = _latest_run_dir()
+            if run_dir is None:
+                notifier.send_message("Cannot find any previous runs to reuse.")
+                return
+        else:
+            candidate = RUNS_DIR / args.reuse_run
+            if not candidate.exists():
+                notifier.send_message(f"Run '{args.reuse_run}' was not found in {RUNS_DIR}")
+                return
+            run_dir = candidate
+    else:
+        meta = scrape_crop_ocr(site=args.site, conf=args.conf)
+        if "error" in meta:
+            notifier.send_message(f"Pipeline failed: {meta['error']}")
+            return
+        run_dir = RUNS_DIR / meta["run_id"]
+
     ocr_csv = run_dir / "ocr_results.csv"
     try:
         results = _read_ocr_results(ocr_csv)
@@ -173,6 +199,10 @@ def main() -> int:
         type=Path,
         default=default_filter_file,
         help="Path to newline separated filter list (defaults to filters/keywords.txt or TELEGRAM_FILTER_FILE env).",
+    )
+    parser.add_argument(
+        "--reuse-run",
+        help="Skip scraping/OCR and reuse an existing run folder (pass 'latest' to use the newest run).",
     )
     parser.add_argument(
         "--run-at",

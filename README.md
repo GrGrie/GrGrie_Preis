@@ -70,4 +70,6 @@ You can let the scraper run automatically and send filtered products (crop image
 
 The runner executes the entire pipeline (scrape → crop → OCR), filters OCR rows whose name contains any of the provided keywords, sends every matching crop as a Telegram photo (captioned with the OCR output), and optionally attaches the `ocr_results.csv` file. Use `--max-results N` if you only need the first *N* matches per run.
 
+Already have a run and just want to re-send its OCR output? Pass `--reuse-run latest` (or a specific folder name) and the runner will skip scraping/OCR, load the existing `ocr_results.csv`, and push those matches to Telegram.
+
 > **Scheduling tip:** `--run-at` keeps the script alive so it can wake up at the chosen time. If you prefer not to keep a terminal open, run `python telegram_runner.py ...` from a cron/systemd job (on any always-on machine or VPS) at the cadence you need.
