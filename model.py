@@ -53,8 +53,8 @@ def main():
         evaluate_model(args.eval_model, args.eval_data, args.eval_conf)
         return
     
-    # Load pretrained model
-    model = YOLO("yolo11n.pt")
+    # Load pretrained model (use YOLO11s for more capacity)
+    model = YOLO("yolo11s.pt")
     
     # Prepare dataset from all week folders
     make_pathlists("data/originals", "configs/lists", args.train_ratio, args.val_ratio, args.test_ratio)
