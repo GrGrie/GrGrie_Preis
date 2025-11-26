@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -64,3 +65,37 @@ class TelegramNotifier:
             if caption:
                 data["caption"] = caption
             return self._post("sendDocument", data=data, files=files)
+
+    def send_media_group(self, media_items: list[tuple[Path, Optional[str]]]) -> bool:
+        """
+        Send up to 10 photos in a single album.
+        Each tuple is (path, caption).
+        """
+        if not media_items:
+            return False
+
+        files = {}
+        media_payload = []
+        handles = []
+        try:
+            for idx, (photo_path, caption) in enumerate(media_items):
+                photo_path = Path(photo_path)
+                if not photo_path.exists():
+                    self._log.error("Photo path does not exist: %s", photo_path)
+                    continue
+                handle = photo_path.open("rb")
+                handles.append(handle)
+                file_key = f"photo{idx}"
+                files[file_key] = handle
+                media_payload.append({
+                    "type": "photo",
+                    "media": f"attach://{file_key}",
+                    **({"caption": caption} if caption else {})
+                })
+            if not media_payload:
+                return False
+            data = {"chat_id": self.chat_id, "media": json.dumps(media_payload)}
+            return self._post("sendMediaGroup", data=data, files=files)
+        finally:
+            for handle in handles:
+                handle.close()
