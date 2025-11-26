@@ -46,3 +46,28 @@ To train the YOLO model for Name/Price detection:
     ```bash
     python utils/train_layout.py --source my_dataset --epochs 50
     ```
+
+## 📲 Telegram Bot Automation
+You can let the scraper run automatically and send filtered products (crop image + OCR name/price) straight to a Telegram chat.
+
+1. Create a Telegram bot via [@BotFather](https://t.me/BotFather) and invite it to your chat/channel. Note the bot token and the `chat_id` (use [@userinfobot](https://t.me/userinfobot) or the Telegram API to retrieve it).
+2. Export the credentials (or place them in a `.env` file):
+   ```bash
+   export TELEGRAM_BOT_TOKEN="123456:abcdef"
+   export TELEGRAM_CHAT_ID="987654321"
+   # Optional default filters (comma separated substrings)
+   export TELEGRAM_FILTERS="Fettarme, Bio"
+   ```
+   By default the runner also looks for `filters/keywords.txt` (one keyword per line, `#` comments allowed). Edit that file once and you never have to pass `--filters`. Override the path with `--filter-file custom.txt` or `TELEGRAM_FILTER_FILE=/path/to/file`.
+3. Run the automation once immediately:
+   ```bash
+   python telegram_runner.py --site lidl --conf 0.75 --filters Fettarme
+   ```
+4. Or schedule it daily (local time) and also send the aggregated CSV:
+   ```bash
+   python telegram_runner.py --run-at 07:30 --send-csv
+   ```
+
+The runner executes the entire pipeline (scrape → crop → OCR), filters OCR rows whose name contains any of the provided keywords, sends every matching crop as a Telegram photo (captioned with the OCR output), and optionally attaches the `ocr_results.csv` file. Use `--max-results N` if you only need the first *N* matches per run.
+
+> **Scheduling tip:** `--run-at` keeps the script alive so it can wake up at the chosen time. If you prefer not to keep a terminal open, run `python telegram_runner.py ...` from a cron/systemd job (on any always-on machine or VPS) at the cadence you need.
