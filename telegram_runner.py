@@ -3,8 +3,7 @@ Utility entry point to run the full scrape + crop + OCR pipeline on a schedule
 and push filtered results to Telegram.
 
 Example:
-    python telegram_runner.py --site lidl --conf 0.75 --filters Fettarme \
-        --run-at 07:30 --send-csv
+    python telegram_runner.py --site lidl --conf 0.75 --filters Fettarme --run-at 07:30 --send-csv
 """
 
 from __future__ import annotations
