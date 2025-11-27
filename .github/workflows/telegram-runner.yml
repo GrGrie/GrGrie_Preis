@@ -13,10 +13,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 4 * * 1'
     runs-on: ubuntu-latest
     timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      matrix:
-        site: [lidl, aldi, netto]
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -49,10 +45,10 @@ jobs:
         run: |
           mkdir -p static data/originals filters
 
-      - name: Run Telegram pipeline (${{ matrix.site }})
+      - name: Run Telegram pipeline (lidl, aldi, netto)
         run: |
           set -euo pipefail
-          python telegram_runner.py --site ${{ matrix.site }} --conf 0.75 --send-csv
+          python telegram_runner.py --sites lidl aldi netto --conf 0.75 --send-csv
 
   run-thursday-sites:
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 4 * * 4'

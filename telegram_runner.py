@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta, time as dtime
@@ -62,49 +64,86 @@ def _find_crop(crops_dir: Path, filename_stem: str) -> Path | None:
     return None
 
 
+def _site_from_meta(run_dir: Path) -> str | None:
+    meta_path = run_dir / "meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        data = json.loads(meta_path.read_text("utf-8"))
+        return data.get("site")
+    except Exception:
+        return None
+
+
+_PAGE_PATTERN = re.compile(r"p(\d+)", re.IGNORECASE)
+
+
+def _extract_page_number(filename: str | None) -> int | None:
+    if not filename:
+        return None
+    match = _PAGE_PATTERN.search(filename)
+    if not match:
+        return None
+    digits = match.group(1).lstrip("0")
+    try:
+        return int(digits or "0")
+    except ValueError:
+        return None
+
+
+def _page_caption(row: dict) -> str:
+    page_num = _extract_page_number(row.get("filename"))
+    page_label = f"Page {page_num}" if page_num is not None else "Page ?"
+    name = row.get("name") or "(no name)"
+    price = row.get("price") or "?"
+    return f"{page_label} - {name} - {price}"
+
+
 def _send_results(
     notifier: TelegramNotifier,
-    run_dir: Path,
-    results: list[dict],
+    run_infos: list[dict],
     filters: list[str],
     max_results: int | None,
     send_csv: bool,
 ) -> None:
-    filtered_results = _filter_results(results, filters)
-    total = len(results)
-    matched = len(filtered_results)
-    if max_results is not None:
-        filtered_results = filtered_results[:max_results]
+    if not run_infos:
+        notifier.send_message("No OCR results available.")
+        return
 
-    filter_text = ", ".join(filters) if filters else "no filters"
-    summary = (
-        "Groceries pipeline finished\n"
-        f"Run folder: {run_dir.name}\n"
-        f"Matched {matched} / {total} products for {filter_text}."
-    )
-    notifier.send_message(summary)
+    for info in run_infos:
+        rows = info["results"]
+        filtered = _filter_results(rows, filters)
+        total = len(rows)
+        matched = len(filtered)
+        effective = filtered if max_results is None else filtered[:max_results]
 
-    crops_dir = run_dir / "crops"
-    batch: list[tuple[Path, str]] = []
-
-    for idx, row in enumerate(filtered_results, start=1):
-        crop_path = _find_crop(crops_dir, row.get("filename", ""))
-        caption = f"{row.get('name','(no name)')}\nPrice: {row.get('price','?') or '?'}"
-        if crop_path and crop_path.exists():
-            batch.append((crop_path, caption))
-            if len(batch) == 10:
-                notifier.send_media_group(batch)
-                batch.clear()
+        csv_caption = (
+            f"Finished run for {info['site']}. Matches {matched}/{total}. "
+            "Results attached."
+        )
+        csv_path = info["run_dir"] / "ocr_results.csv"
+        if send_csv and csv_path.exists():
+            notifier.send_document(csv_path, caption=csv_caption)
         else:
-            notifier.send_message(caption)
+            notifier.send_message(csv_caption)
 
-    if batch:
-        notifier.send_media_group(batch)
+        crops_dir = info["run_dir"] / "crops"
+        if not effective:
+            notifier.send_message(f"{info['site']}: No matching crops to display.")
+            continue
 
-    if send_csv:
-        csv_path = run_dir / "ocr_results.csv"
-        if csv_path.exists():
-            notifier.send_document(csv_path, caption="Full OCR CSV")
+        for idx in range(0, len(effective), 10):
+            chunk = effective[idx : idx + 10]
+            media_items: list[tuple[Path, str]] = []
+            for row in chunk:
+                crop_path = _find_crop(crops_dir, row.get("filename", ""))
+                caption = _page_caption(row)
+                if crop_path and crop_path.exists():
+                    media_items.append((crop_path, caption))
+                else:
+                    notifier.send_message(f"{info['site']}: {caption} (image missing)")
+            if media_items:
+                notifier.send_media_group(media_items)
 
 
 def _latest_run_dir() -> Path | None:
@@ -141,7 +180,12 @@ def _parse_filters(cli_filters: Sequence[str] | None, file_path: Path | None) ->
 
 
 def run_once(args, notifier: TelegramNotifier) -> None:
-    run_dir = None
+    if args.reuse_run and args.sites:
+        notifier.send_message("Cannot combine --reuse-run with --sites.")
+        return
+
+    filters = _parse_filters(args.filters, args.filter_file)
+    run_infos: list[dict] = []
 
     if args.reuse_run:
         if args.reuse_run.lower() == "latest":
@@ -155,24 +199,41 @@ def run_once(args, notifier: TelegramNotifier) -> None:
                 notifier.send_message(f"Run '{args.reuse_run}' was not found in {RUNS_DIR}")
                 return
             run_dir = candidate
-    else:
-        meta = scrape_crop_ocr(site=args.site, conf=args.conf)
-        if "error" in meta:
-            notifier.send_message(f"Pipeline failed: {meta['error']}")
-            return
-        run_dir = RUNS_DIR / meta["run_id"]
 
-    ocr_csv = run_dir / "ocr_results.csv"
-    try:
-        results = _read_ocr_results(ocr_csv)
-    except FileNotFoundError as exc:
-        notifier.send_message(f"OCR results missing: {exc}")
-        return
-    filters = _parse_filters(args.filters, args.filter_file)
+        try:
+            results = _read_ocr_results(run_dir / "ocr_results.csv")
+        except FileNotFoundError as exc:
+            notifier.send_message(f"OCR results missing: {exc}")
+            return
+        site_name = (_site_from_meta(run_dir) or args.site or "unknown").title()
+        run_infos.append({
+            "site": site_name,
+            "run_dir": run_dir,
+            "results": results,
+        })
+    else:
+        sites = args.sites if args.sites else [args.site]
+        for site in sites:
+            meta = scrape_crop_ocr(site=site, conf=args.conf)
+            if "error" in meta:
+                notifier.send_message(f"Pipeline failed for {site}: {meta['error']}")
+                return
+            run_dir = RUNS_DIR / meta["run_id"]
+            try:
+                results = _read_ocr_results(run_dir / "ocr_results.csv")
+            except FileNotFoundError as exc:
+                notifier.send_message(f"OCR results missing for {site}: {exc}")
+                return
+            site_name = (meta.get("site") or _site_from_meta(run_dir) or site).title()
+            run_infos.append({
+                "site": site_name,
+                "run_dir": run_dir,
+                "results": results,
+            })
+
     _send_results(
         notifier=notifier,
-        run_dir=run_dir,
-        results=results,
+        run_infos=run_infos,
         filters=filters,
         max_results=args.max_results,
         send_csv=args.send_csv,
@@ -187,6 +248,11 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(description="Schedule scraper pipeline and push results to Telegram")
     parser.add_argument("--site", default="lidl", help="Site identifier to scrape")
+    parser.add_argument(
+        "--sites",
+        nargs="+",
+        help="List of site identifiers to process sequentially and merge into one notification",
+    )
     parser.add_argument("--conf", type=float, default=0.75, help="Confidence threshold for cropping")
     parser.add_argument(
         "--filters",
