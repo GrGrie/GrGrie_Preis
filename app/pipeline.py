@@ -1,3 +1,4 @@
+import csv
 import shutil
 import os, sys, json, time, uuid, subprocess
 from datetime import datetime, timedelta
@@ -21,6 +22,14 @@ def _new_run_dir() -> Path:
     run_id = time.strftime("%Y-%m-%d_%H-%M-%S_") + uuid.uuid4().hex[:6]
     rd = RUNS_DIR / run_id
     return rd
+
+
+def _write_empty_ocr_csv(csv_path: Path) -> None:
+    """Ensure the OCR CSV exists with just the header row."""
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    with csv_path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=["filename", "name", "price"])
+        writer.writeheader()
 
 def _get_this_week_monday() -> str:
     """Get the date string (YYYY-MM-DD) for this week's Monday"""
@@ -101,7 +110,8 @@ def _try_call_scraper(site: str, output_dir: Path) -> bool:
         return False
 
 def scrape_crop_ocr(site: str = "lidl", conf: float = 0.75) -> dict:
-    run_dir   = _new_run_dir()
+    run_dir = _new_run_dir()
+    run_dir.mkdir(parents=True, exist_ok=True)
     crops_dir = run_dir / "crops"
 
     # 1) Scrape PNG pages for the given site and prospekt
@@ -150,8 +160,10 @@ def scrape_crop_ocr(site: str = "lidl", conf: float = 0.75) -> dict:
     
     # 3) Run OCR pipeline on the generated crops
     ocr_csv = run_dir / "ocr_results.csv"
-    
-    if crops_dir.exists() and list(crops_dir.glob("*.jpg")):
+    ocr_results = []
+
+    crop_images = list(crops_dir.glob("*.jpg")) if crops_dir.exists() else []
+    if crop_images:
         print(f"[INFO] [pipeline] Running OCR on crops in {crops_dir}...")
         try:
             ocr_results = run_ocr_on_crops(
@@ -162,15 +174,20 @@ def scrape_crop_ocr(site: str = "lidl", conf: float = 0.75) -> dict:
                 img_size=640,
                 lang="de"
             )
-            # Update meta.json with OCR info
-            if meta_path.exists():
-                meta_data = json.loads(meta_path.read_text("utf-8"))
-                meta_data["ocr_count"] = len(ocr_results)
-                meta_data["ocr_csv"] = f"/static/runs/{run_dir.name}/ocr_results.csv"
-                meta_path.write_text(json.dumps(meta_data, ensure_ascii=False, indent=2), "utf-8")
             print(f"[INFO] [pipeline] OCR completed. {len(ocr_results)} products processed.")
         except Exception as e:
             print(f"[ERROR] [pipeline] OCR failed: {e}")
+    else:
+        print(f"[WARN] [pipeline] No crops found in {crops_dir}. Creating empty OCR CSV.")
+
+    if not ocr_csv.exists():
+        _write_empty_ocr_csv(ocr_csv)
+
+    meta.update({
+        "ocr_count": len(ocr_results),
+        "ocr_csv": f"/static/runs/{run_dir.name}/ocr_results.csv",
+    })
+    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
 
     return meta
 
