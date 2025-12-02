@@ -1,7 +1,0 @@
-# One keyword per line (case-insensitive substring match)
-Brustfillet
-Skyr
-Magerstufe
-Haferflocken
-Kiwi
-Joghurt

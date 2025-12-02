@@ -244,7 +244,7 @@ def main() -> int:
     load_dotenv()
 
     env_filter_file = os.getenv("TELEGRAM_FILTER_FILE")
-    default_filter_file = Path(env_filter_file) if env_filter_file else Path("filters/keywords.txt")
+    default_filter_file = Path(env_filter_file) if env_filter_file else Path("configs/keywords.txt")
 
     parser = argparse.ArgumentParser(description="Schedule scraper pipeline and push results to Telegram")
     parser.add_argument("--site", default="lidl", help="Site identifier to scrape")
@@ -263,7 +263,7 @@ def main() -> int:
         "--filter-file",
         type=Path,
         default=default_filter_file,
-        help="Path to newline separated filter list (defaults to filters/keywords.txt or TELEGRAM_FILTER_FILE env).",
+        help="Path to newline separated filter list (defaults to configs/keywords.txt or TELEGRAM_FILTER_FILE env).",
     )
     parser.add_argument(
         "--reuse-run",

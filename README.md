@@ -58,7 +58,7 @@ You can let the scraper run automatically and send filtered products (crop image
    # Optional default filters (comma separated substrings)
    export TELEGRAM_FILTERS="Fettarme, Bio"
    ```
-   By default the runner also looks for `filters/keywords.txt` (one keyword per line, `#` comments allowed). Edit that file once and you never have to pass `--filters`. Override the path with `--filter-file custom.txt` or `TELEGRAM_FILTER_FILE=/path/to/file`.
+   By default the runner also looks for `configs/keywords.txt` (one keyword per line, `#` comments allowed). Edit that file once and you never have to pass `--filters`. Override the path with `--filter-file custom.txt` or `TELEGRAM_FILTER_FILE=/path/to/file`.
 3. Run the automation once immediately:
    ```bash
    python telegram_runner.py --site lidl --conf 0.75 --filters Fettarme
