@@ -30,3 +30,6 @@ dependencies:
     - python-dotenv
     - requests
     - ipykernel
+    - wandb
+    - huggingface_hub
+    - datasets

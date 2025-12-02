@@ -1,17 +1,17 @@
+import os
 from pathlib import Path
 import random
 from ultralytics import YOLO
+from ultralytics import settings
 import torch
 import argparse
-import os
-import shutil
 import cv2
 from datetime import datetime
 
 def main():
     parser = argparse.ArgumentParser(description="YOLOv11 Training Model")
     parser.add_argument("--config", type=str, default="configs/dataset.yaml", help="Path to dataset config file")
-    parser.add_argument("--num_epochs", type=int, default=50, help="Number of training epochs")
+    parser.add_argument("--num_epochs", type=int, default=500, help="Number of training epochs")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of workers for data loading")
     parser.add_argument("--image_size", type=int, default=640, choices=[320, 640, 1280], help="Image size")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
@@ -55,6 +55,8 @@ def main():
     
     # Load pretrained model (use YOLO11s for more capacity)
     model = YOLO("yolo11s.pt")
+    
+    settings.update({"wandb": False})  # Disable wandb globally
     
     # Prepare dataset from all week folders
     make_pathlists("data/originals", "configs/lists", args.train_ratio, args.val_ratio, args.test_ratio)
