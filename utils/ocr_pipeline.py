@@ -152,6 +152,16 @@ def run_ocr_on_crops(crops_dir: Path, output_csv: Path, model_path: str = "model
     files = sorted([p for p in crops_dir.glob("*") if p.suffix.lower() in ['.jpg', '.jpeg', '.png', '.bmp']])
     print(f"[INFO] [ocr_pipeline] Processing {len(files)} crop images...")
     
+    # Load keywords
+    keywords_path = Path("configs/keywords.txt")
+    keywords = []
+    if keywords_path.exists():
+        with open(keywords_path, "r", encoding="utf-8") as f:
+            keywords = [line.strip().lower() for line in f if line.strip() and not line.startswith("#")]
+        print(f"[INFO] [ocr_pipeline] Loaded {len(keywords)} keywords for filtering.")
+    else:
+        print(f"[WARN] [ocr_pipeline] Keywords file not found at {keywords_path}. No filtering will be applied.")
+
     results = []
     
     for i, file_path in enumerate(files):
@@ -203,6 +213,12 @@ def run_ocr_on_crops(crops_dir: Path, output_csv: Path, model_path: str = "model
             raw_price = prices[0]['text']
             best_price = clean_price(raw_price)
         
+        # Filter by keywords
+        if keywords:
+            name_lower = full_name.lower()
+            if not any(k in name_lower for k in keywords):
+                continue
+        
         print(f"[INFO] [ocr_pipeline]  -> Name: {full_name}")
         print(f"[INFO] [ocr_pipeline]  -> Price: {best_price}")
         
@@ -220,7 +236,7 @@ def run_ocr_on_crops(crops_dir: Path, output_csv: Path, model_path: str = "model
         writer.writerows(results)
     
     print(f"[INFO] [ocr_pipeline] ✓ Results saved to {output_csv}")
-    print(f"[INFO] [ocr_pipeline] ✓ Processed {len(results)} images")
+    print(f"[INFO] [ocr_pipeline] ✓ Processed {len(results)} images (filtered from {len(files)})")
     
     return results
 
