@@ -2,6 +2,7 @@
 Enhanced YOLO training script with YOLOv11s and strong augmentation. Output model is used for OCR pipeline.
 """
 from ultralytics import YOLO
+from utils import ONNXExporter
 import argparse
 import shutil
 from pathlib import Path
@@ -133,16 +134,15 @@ def main():
         # Get best model path
         best_model_path = Path("runs/detect") / args.name / "weights" / "best.pt"
         
-        # Export to ONNX
-        print("\nExporting best model to ONNX...")
-        best_model = YOLO(str(best_model_path))
-        onnx_path = best_model.export(format="onnx", dynamic=True, simplify=True)
-        print(f"ONNX model exported to: {onnx_path}")
-        
         # Copy to models/ocr/
         output_dir = Path("models/ocr")
         output_dir.mkdir(parents=True, exist_ok=True)
         
+        # Export to ONNX
+        print("\nExporting best model to ONNX...")
+        ONNXExporter.export_to_onnx(best_model_path, output_dir / "best.onnx")
+        print(f"ONNX model exported to: {output_dir / 'best.onnx'}")
+
         # Backup old model
         old_onnx = output_dir / "best.onnx"
         if old_onnx.exists():
