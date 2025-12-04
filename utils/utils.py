@@ -25,9 +25,6 @@ def clean_price(text):
         return f"{match.group(1)}.{match.group(2)}"
     return text
 
-
-
-
 class ImageDownloader:
     """Handles image downloading functionality"""
 
@@ -109,16 +106,6 @@ class WebDriverManager:
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
         options.add_argument('--log-level=3')  # Only show fatal errors
-
-
-
-
-
-
-
-
-
-
 
 class ImageDownloader:
     """Handles image downloading functionality"""
@@ -207,6 +194,7 @@ class WebDriverManager:
         options.add_argument(f"--window-size={self.window_size}")
         service = Service(ChromeDriverManager().install())
         return webdriver.Chrome(service=service, options=options)
+
 class ONNXExporter:
     """Handles ONNX export and compatibility checks"""
 
@@ -218,6 +206,10 @@ class ONNXExporter:
             model = YOLO(pt_path)
             model.export(format="onnx", dynamic=True, simplify=True, opset=opset)
             print(f"[INFO] Exported {pt_path} to {onnx_path}")
+            
+            # Ensure compatibility (patch IR version if needed)
+            ONNXExporter.ensure_model_compatibility(str(onnx_path))
+            
             return True
         except ImportError:
             print(f"[ERROR] 'ultralytics' not installed. Cannot export from .pt.")

@@ -138,21 +138,19 @@ def main():
         output_dir = Path("models/ocr")
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Export to ONNX
-        print("\nExporting best model to ONNX...")
-        ONNXExporter.export_to_onnx(best_model_path, output_dir / "best.onnx")
-        print(f"ONNX model exported to: {output_dir / 'best.onnx'}")
+        # Define paths
+        target_onnx = output_dir / "best.onnx"
+        backup_onnx = output_dir / "best_backup.onnx"
 
-        # Backup old model
-        old_onnx = output_dir / "best.onnx"
-        if old_onnx.exists():
-            backup_path = output_dir / "best_backup.onnx"
-            shutil.copy2(old_onnx, backup_path)
-            print(f"Backed up old model to: {backup_path}")
-        
-        # Copy new model
-        shutil.copy2(onnx_path, old_onnx)
-        print(f"New model saved to: {old_onnx}")
+        # Backup existing model if it exists
+        if target_onnx.exists():
+            shutil.copy2(target_onnx, backup_onnx)
+            print(f"Backed up old model to: {backup_onnx}")
+
+        # Export to ONNX (this will overwrite target_onnx)
+        print("\nExporting best model to ONNX...")
+        ONNXExporter.export_to_onnx(best_model_path, target_onnx)
+        print(f"ONNX model exported to: {target_onnx}")
         
         # Also save .pt model
         shutil.copy2(best_model_path, output_dir / "best.pt")
@@ -160,7 +158,7 @@ def main():
         
         print("\n✓ Training complete!")
         print(f"✓ Best model: {best_model_path}")
-        print(f"✓ ONNX model: {old_onnx}")
+        print(f"✓ ONNX model: {target_onnx}")
         
     except Exception as e:
         print(f"Error: {e}")
