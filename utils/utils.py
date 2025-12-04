@@ -3,11 +3,6 @@ import sys
 import shutil
 import re
 from pathlib import Path
-try:
-    import onnx
-    HAS_ONNX = True
-except ImportError:
-    HAS_ONNX = False
 import requests
 from datetime import datetime, timedelta
 from typing import Optional, Dict
@@ -15,6 +10,13 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+
+try:
+    import onnx
+    HAS_ONNX = True
+except ImportError:
+    HAS_ONNX = False
+    print("[WARN] 'onnx' module not found. ONNX model patching will be disabled.")
 
 def clean_price(text):
     """Extract and format price from OCR text."""
@@ -50,6 +52,7 @@ class ImageDownloader:
         except Exception as e:
             print(f"Error downloading {url}: {e}")
             return False
+
 class DirectoryManager:
     """Manages directory creation and file paths"""
 
@@ -82,88 +85,7 @@ class DirectoryManager:
         """Get current week number"""
         now = datetime.now()
         return str(now.isocalendar()[1])
-class WebDriverManager:
-    """Manages WebDriver setup and configuration"""
 
-    def __init__(self, headless=True, window_size="960,1080"):
-        self.headless = headless
-        self.window_size = window_size
-
-    def setup_driver(self):
-        options = Options()
-        if self.headless:
-            # modern headless flag
-            options.add_argument("--headless=new")
-        # Suppress GCM/GCM registration errors
-        options.add_experimental_option('excludeSwitches', ['enable-logging'])
-        ua = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-          "AppleWebKit/537.36 (KHTML, like Gecko) "
-          "Chrome/140.0.0.0 Safari/537.36")
-        options.add_argument(f"--user-agent={ua}")
-        
-        # Additional useful options for scraping
-        options.add_argument('--disable-blink-features=AutomationControlled')
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option("useAutomationExtension", False)
-        options.add_argument('--log-level=3')  # Only show fatal errors
-
-class ImageDownloader:
-    """Handles image downloading functionality"""
-
-    def __init__(self):
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-
-    def download_image(self, url: str, filepath: str, headers: Optional[Dict] = None) -> bool:
-        """Download image from URL to filepath"""
-        try:
-            if headers is None:
-                headers = self.headers
-
-            response = requests.get(url, headers=headers, stream=True)
-            response.raise_for_status()
-
-            with open(filepath, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-
-            return True
-        except Exception as e:
-            print(f"Error downloading {url}: {e}")
-            return False
-class DirectoryManager:
-    """Manages directory creation and file paths"""
-
-    @staticmethod
-    def get_week_folder() -> str:
-        """Get the current week folder name in format YYYY-MM-DD_YYYY-MM-DD"""
-        today = datetime.now()
-        monday = today - timedelta(days=today.weekday())
-        sunday = monday + timedelta(days=6)
-        return f"{monday.strftime('%Y-%m-%d')}_{sunday.strftime('%Y-%m-%d')}"
-
-    @staticmethod
-    def create_download_directory(base_path: str, subfolder: str = None) -> str:
-        """Create and return download directory path"""
-        if subfolder is None:
-            subfolder = DirectoryManager.get_week_folder()
-
-        download_dir = os.path.join(base_path, subfolder)
-        
-        # Check if the directory already exists
-        if not os.path.exists(download_dir):
-            os.makedirs(download_dir, exist_ok=True)
-        else:
-            print(f"[DEBUG] Directory already exists: {download_dir}")
-            
-        return download_dir
-
-    @staticmethod
-    def get_current_week_number() -> str:
-        """Get current week number"""
-        now = datetime.now()
-        return str(now.isocalendar()[1])
 class WebDriverManager:
     """Manages WebDriver setup and configuration"""
 
