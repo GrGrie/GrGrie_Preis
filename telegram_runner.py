@@ -75,6 +75,18 @@ def _site_from_meta(run_dir: Path) -> str | None:
         return None
 
 
+def _read_total_crops(run_dir: Path) -> int | None:
+    """Read the total number of crops from meta.json."""
+    meta_path = run_dir / "meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        data = json.loads(meta_path.read_text("utf-8"))
+        return data.get("count")
+    except Exception:
+        return None
+
+
 _PAGE_PATTERN = re.compile(r"p(\d+)", re.IGNORECASE)
 
 
@@ -113,12 +125,16 @@ def _send_results(
     for info in run_infos:
         rows = info["results"]
         filtered = _filter_results(rows, filters)
-        total = len(rows)
         matched = len(filtered)
         effective = filtered if max_results is None else filtered[:max_results]
+        
+        # Get total crops from meta.json, fallback to OCR results count
+        total_crops = _read_total_crops(info["run_dir"])
+        if total_crops is None:
+            total_crops = len(rows)
 
         csv_caption = (
-            f"Finished run for {info['site']}. Matches {matched}/{total}. "
+            f"Finished run for {info['site']}. Matches {matched}/{total_crops}. "
             "Results attached."
         )
         csv_path = info["run_dir"] / "ocr_results.csv"
